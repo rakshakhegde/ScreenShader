@@ -214,18 +214,7 @@ class MetalRenderer {
       return
     }
 
-    // Set scissor rect to exclude the menu bar.
     if let screen = NSScreen.main {
-      let scaleFactor = NSScreen.main?.backingScaleFactor ?? 1.0
-      let visibleFrame = screen.visibleFrame
-      let screenHeight = screen.frame.height
-      let scissorRect = MTLScissorRect(
-        x: Int(visibleFrame.origin.x * scaleFactor),
-        y: Int((screenHeight - visibleFrame.origin.y - visibleFrame.height) * scaleFactor),
-        width: Int(visibleFrame.width * scaleFactor),
-        height: Int(visibleFrame.height * scaleFactor)
-      )
-      encoder.setScissorRect(scissorRect)
 
       if let renderPipeline = self.renderPipeline {
         var screenSize = vector_float2(Float(screen.frame.width), Float(screen.frame.height))
