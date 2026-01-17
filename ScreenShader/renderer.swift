@@ -17,7 +17,6 @@ class MetalRenderer {
   private var textureCache: CVMetalTextureCache!
   private var activeEffectSource: String? = nil
   private var renderPipeline: MTLRenderPipelineState? = nil
-  private let baseTime = ProcessInfo.processInfo.systemUptime
 
   init(metalLayer: CAMetalLayer) {
     guard let device = MTLCreateSystemDefaultDevice() else {
@@ -220,7 +219,7 @@ class MetalRenderer {
         var screenSize = vector_float2(Float(screen.frame.width), Float(screen.frame.height))
         var mousePosition = vector_float2(
           Float(NSEvent.mouseLocation.x), Float(NSEvent.mouseLocation.y))
-        var time = Float(ProcessInfo.processInfo.systemUptime - self.baseTime)
+        var time = Float(ProcessInfo.processInfo.systemUptime)
 
         encoder.setRenderPipelineState(renderPipeline)
         encoder.setFragmentTexture(texture, index: 0)
