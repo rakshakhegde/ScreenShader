@@ -94,6 +94,7 @@ class OverlayController: NSObject, MTKViewDelegate {
 
   @objc private func handleScreensWake() {
     Logger.shared.log("handleScreensWake: Screens woke up")
+    lastScreenConfig = ""
     triggerRebuild()
   }
 
@@ -108,7 +109,6 @@ class OverlayController: NSObject, MTKViewDelegate {
 
   private func triggerRebuild() {
     // Reset config to force rebuild
-    lastScreenConfig = ""
     // Use debounced screen change handler
     handleScreenChange()
   }
@@ -135,6 +135,9 @@ class OverlayController: NSObject, MTKViewDelegate {
     // Check if config actually changed
     let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID ?? 0
     let newConfig = "\(displayID)-\(screen.frame)-\(screen.backingScaleFactor)"
+    
+    Logger.shared.log("applyScreenChange: lastScreenConfig: \(lastScreenConfig);; newConfig: \(newConfig)")
+    
     if newConfig == lastScreenConfig {
       Logger.shared.log("applyScreenChange: Config unchanged, skipping")
       return
