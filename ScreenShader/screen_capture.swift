@@ -1,5 +1,6 @@
 import ScreenCaptureKit
 import AppKit
+import CoreGraphics
 
 class ScreenCapture {
   var config: Config! = nil
@@ -63,6 +64,17 @@ class ScreenCapture {
         streamConfig.minimumFrameInterval = CMTime(
           value: 1, timescale: CMTimeScale(self.config.targetFPS))
         streamConfig.pixelFormat = kCVPixelFormatType_32BGRA
+
+        if let cgcs = mainScreen.colorSpace?.cgColorSpace,
+           let csName = cgcs.name {
+          streamConfig.colorSpaceName = csName
+          Logger.shared.log("startCapture: Set streamConfig.colorSpaceName=\(csName as String)")
+        } else {
+          Logger.shared.log("startCapture: No named colorspace for mainScreen; leaving streamConfig.colorSpaceName unset")
+        }
+
+        Logger.shared.log("startCapture: streamConfig.pixelFormat=\(streamConfig.pixelFormat)")
+
         streamConfig.capturesAudio = false
         streamConfig.showsCursor = false
 

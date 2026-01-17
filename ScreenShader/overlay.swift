@@ -1,4 +1,5 @@
 import AppKit
+import CoreGraphics
 import Metal
 import MetalKit
 
@@ -19,7 +20,11 @@ class OverlayController: NSObject, MTKViewDelegate {
     self.errorMessage = errorMessage
     super.init()
 
-    let contentRect = NSScreen.main!.frame
+    guard let screen = NSScreen.main else {
+      fatalError("No main screen found")
+    }
+
+    let contentRect = screen.frame
 
     self.window = NSWindow(
       contentRect: contentRect,
@@ -39,7 +44,7 @@ class OverlayController: NSObject, MTKViewDelegate {
     self.window.contentView = metalView
     self.window.makeKeyAndOrderFront(nil)
 
-    self.renderer = MetalRenderer(metalLayer: metalView.metalLayer)
+    self.renderer = self.makeRendererForCurrentScreen(metalLayer: metalView.metalLayer)
 
     self.screenCapture = ScreenCapture()
     self.screenCapture.config = self.config
@@ -84,6 +89,50 @@ class OverlayController: NSObject, MTKViewDelegate {
       selector: #selector(handleScreensSleep),
       name: NSWorkspace.screensDidSleepNotification,
       object: nil
+    )
+  }
+
+  private func usesSRGBTransfer(colorSpaceName: CFString?) -> Bool {
+    guard let name = colorSpaceName else { return false }
+    return name == CGColorSpace.sRGB
+      || name == CGColorSpace.displayP3
+      || name == CGColorSpace.extendedSRGB
+      || name == CGColorSpace.extendedDisplayP3
+  }
+
+  private func makeRendererForCurrentScreen(metalLayer: CAMetalLayer) -> MetalRenderer {
+    // Prefer the actual screen the window is on when available.
+    let screen = self.window.screen ?? NSScreen.main
+
+    // Fall back to sRGB if AppKit doesn't provide a color space.
+    let screenColorSpace: CGColorSpace =
+      (screen?.colorSpace?.cgColorSpace) ?? (CGColorSpace(name: CGColorSpace.sRGB)!)
+
+    let colorSpaceName = screenColorSpace.name
+    let wantsEDR = (screen?.maximumPotentialExtendedDynamicRangeColorComponentValue ?? 1.0) > 1.0
+    let srgbTransfer = usesSRGBTransfer(colorSpaceName: colorSpaceName)
+
+    let drawablePixelFormat: MTLPixelFormat = {
+      if wantsEDR {
+        return srgbTransfer ? .bgra10_xr_srgb : .bgra10_xr
+      }
+      return srgbTransfer ? .bgra8Unorm_srgb : .bgra8Unorm
+    }()
+
+    let captureTexturePixelFormat: MTLPixelFormat = srgbTransfer ? .bgra8Unorm_srgb : .bgra8Unorm
+
+    let screenName = screen?.localizedName ?? "(unknown)"
+    let csNameString = colorSpaceName.map { $0 as String } ?? "(nil)"
+    Logger.shared.log(
+      "display config: screen=\(screenName), colorSpaceName=\(csNameString), wantsEDR=\(wantsEDR), drawablePF=\(drawablePixelFormat), captureTexPF=\(captureTexturePixelFormat)"
+    )
+
+    return MetalRenderer(
+      metalLayer: metalLayer,
+      drawablePixelFormat: drawablePixelFormat,
+      colorspace: screenColorSpace,
+      wantsEDR: wantsEDR,
+      captureTexturePixelFormat: captureTexturePixelFormat
     )
   }
 
@@ -162,8 +211,8 @@ class OverlayController: NSObject, MTKViewDelegate {
     window.contentView = metalView
     window.setFrame(contentRect, display: true)
 
-    // Recreate renderer for the new Metal layer
-    self.renderer = MetalRenderer(metalLayer: metalView.metalLayer)
+    // Recreate renderer for the new Metal layer (match current display)
+    self.renderer = self.makeRendererForCurrentScreen(metalLayer: metalView.metalLayer)
 
     // Reapply current effect
     let activeEffect = self.config.effects.getActiveEffect()

@@ -1,3 +1,5 @@
+import AppKit
+import CoreGraphics
 import Metal
 import MetalKit
 
@@ -18,7 +20,16 @@ class MetalRenderer {
   private var activeEffectSource: String? = nil
   private var renderPipeline: MTLRenderPipelineState? = nil
 
-  init(metalLayer: CAMetalLayer) {
+  private let renderTargetPixelFormat: MTLPixelFormat
+  private let captureTexturePixelFormat: MTLPixelFormat
+
+  init(
+    metalLayer: CAMetalLayer,
+    drawablePixelFormat: MTLPixelFormat,
+    colorspace: CGColorSpace,
+    wantsEDR: Bool,
+    captureTexturePixelFormat: MTLPixelFormat
+  ) {
     guard let device = MTLCreateSystemDefaultDevice() else {
       fatalError("Unable to access a Metal device on this system.")
     }
@@ -29,8 +40,13 @@ class MetalRenderer {
     }
     self.commandQueue = queue
 
+    self.renderTargetPixelFormat = drawablePixelFormat
+    self.captureTexturePixelFormat = captureTexturePixelFormat
+
     metalLayer.device = self.device
-    metalLayer.pixelFormat = .bgra8Unorm
+    metalLayer.pixelFormat = drawablePixelFormat
+    metalLayer.colorspace = colorspace
+    metalLayer.wantsExtendedDynamicRangeContent = wantsEDR
     metalLayer.framebufferOnly = true
     metalLayer.contentsScale = NSScreen.main?.backingScaleFactor ?? 1.0
     metalLayer.isOpaque = false
@@ -45,9 +61,11 @@ class MetalRenderer {
     }
   }
 
-  static func buildRenderPipeline(device: MTLDevice, effectSource: String) throws
-    -> MTLRenderPipelineState
-  {
+  static func buildRenderPipeline(
+    device: MTLDevice,
+    effectSource: String,
+    pixelFormat: MTLPixelFormat
+  ) throws -> MTLRenderPipelineState {
     let librarySource = """
       #include <metal_stdlib>
       using namespace metal;
@@ -138,7 +156,7 @@ class MetalRenderer {
     let pipelineDescriptor = MTLRenderPipelineDescriptor()
     pipelineDescriptor.vertexFunction = vertexFunction
     pipelineDescriptor.fragmentFunction = fragmentFunction
-    pipelineDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+    pipelineDescriptor.colorAttachments[0].pixelFormat = pixelFormat
 
     return try device.makeRenderPipelineState(descriptor: pipelineDescriptor)
   }
@@ -152,7 +170,10 @@ class MetalRenderer {
     self.activeEffectSource = effectSource
     do {
       self.renderPipeline = try Self.buildRenderPipeline(
-        device: self.device, effectSource: effectSource)
+        device: self.device,
+        effectSource: effectSource,
+        pixelFormat: self.renderTargetPixelFormat
+      )
     } catch {
       self.renderPipeline = nil
       throw error
@@ -189,7 +210,7 @@ class MetalRenderer {
       self.textureCache,
       contentBuffer,
       nil,
-      .bgra8Unorm,
+      self.captureTexturePixelFormat,
       width,
       height,
       0,
