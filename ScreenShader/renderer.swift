@@ -180,8 +180,6 @@ class MetalRenderer {
     }
   }
 
-  private var lastLogTime: TimeInterval = 0
-
   func renderContentBuffer(window: NSWindow, contentBuffer: CVPixelBuffer) {
     guard let metalView = window.contentView as? MetalView,
           let drawable = metalView.metalLayer.nextDrawable() else {
@@ -190,19 +188,6 @@ class MetalRenderer {
 
     let width = CVPixelBufferGetWidth(contentBuffer)
     let height = CVPixelBufferGetHeight(contentBuffer)
-
-    // Log sizes every 5 seconds
-    let now = ProcessInfo.processInfo.systemUptime
-    if now - lastLogTime > 5.0 {
-      lastLogTime = now
-      let drawableSize = drawable.texture.width
-      let drawableHeight = drawable.texture.height
-      let layerScale = metalView.metalLayer.contentsScale
-      if let screen = NSScreen.main {
-        Logger.shared.log("render: screenFrame=\(screen.frame), backingScale=\(screen.backingScaleFactor)")
-        Logger.shared.log("render: captureBuffer=\(width)x\(height), drawable=\(drawableSize)x\(drawableHeight), layerScale=\(layerScale)")
-      }
-    }
 
     var tempTextureRef: CVMetalTexture?
     let status = CVMetalTextureCacheCreateTextureFromImage(
