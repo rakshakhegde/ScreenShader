@@ -124,7 +124,7 @@ class OverlayController: NSObject, MTKViewDelegate {
     let screenName = screen?.localizedName ?? "(unknown)"
     let csNameString = colorSpaceName.map { $0 as String } ?? "(nil)"
     Logger.shared.log(
-      "display config: screen=\(screenName), colorSpaceName=\(csNameString), wantsEDR=\(wantsEDR), drawablePF=\(drawablePixelFormat), captureTexPF=\(captureTexturePixelFormat)"
+      "display config: screen=\(screenName), colorSpaceName=\(csNameString), wantsEDR=\(wantsEDR), drawablePF=\(pixelFormatName(drawablePixelFormat)), captureTexPF=\(pixelFormatName(captureTexturePixelFormat))"
     )
 
     return MetalRenderer(
@@ -134,6 +134,17 @@ class OverlayController: NSObject, MTKViewDelegate {
       wantsEDR: wantsEDR,
       captureTexturePixelFormat: captureTexturePixelFormat
     )
+  }
+  
+  func pixelFormatName(_ format: MTLPixelFormat) -> String {
+      switch format {
+      case .bgra8Unorm:       return ".bgra8Unorm"
+      case .bgra8Unorm_srgb:  return ".bgra8Unorm_srgb"
+      case .bgra10_xr:        return ".bgra10_xr"
+      case .bgra10_xr_srgb:   return ".bgra10_xr_srgb"
+      // add more cases as needed
+      default:                return "unknown(\(format.rawValue))"
+      }
   }
 
   @objc private func handleWake() {
