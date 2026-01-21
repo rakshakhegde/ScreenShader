@@ -38,20 +38,39 @@ class EffectViewController: NSViewController, NSTextFieldDelegate, NSTextViewDel
     self.nameField.stringValue = self.effects.getName(effect: self.effect)
     self.stackView.addArrangedSubview(self.nameField)
 
+    // Horizontal stack for active button + delete button
+    let horizontalStack = NSStackView()
+    horizontalStack.orientation = .horizontal
+    horizontalStack.alignment = .centerY
+    horizontalStack.distribution = .fill
+
+    // Active button on the left
     self.activeButton = NSButton(
-      checkboxWithTitle: "Active (only one effect can be active at a time)",
-      target: self,
-      action: #selector(self.toggleActive))
+        checkboxWithTitle: "Active (only one effect can be active at a time)",
+        target: self,
+        action: #selector(self.toggleActive)
+    )
     self.activeButton.translatesAutoresizingMaskIntoConstraints = false
     self.activeButton.state = self.effects.isActive(effect: self.effect) ? .on : .off
-    self.stackView.addArrangedSubview(self.activeButton)
+    horizontalStack.addArrangedSubview(self.activeButton)
 
+    // Spacer to push delete button to the right
+    let spacer = NSView()
+    spacer.translatesAutoresizingMaskIntoConstraints = false
+    horizontalStack.addArrangedSubview(spacer)
+
+    // Delete button on the right
     self.deleteButton = NSButton(
-      title: "Delete effect",
-      target: self,
-      action: #selector(self.deleteEffect))
+        title: "Delete effect",
+        target: self,
+        action: #selector(self.deleteEffect)
+    )
     self.deleteButton.translatesAutoresizingMaskIntoConstraints = false
-    self.stackView.addArrangedSubview(self.deleteButton)
+    horizontalStack.addArrangedSubview(self.deleteButton)
+
+    // Add the horizontal stack to the main vertical stack
+    self.stackView.addArrangedSubview(horizontalStack)
+
 
     self.shaderField = SourceTextView()
     self.shaderField.isEditable = true
