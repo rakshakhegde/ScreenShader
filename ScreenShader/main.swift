@@ -1,6 +1,7 @@
 import AppKit
 import CoreGraphics
 import Sparkle
+import Carbon
 
 class ScreenManager: NSObject {
   private var config: Config
@@ -162,6 +163,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     self.screenManager = ScreenManager(config: self.config, metrics: self.metrics, errorMessage: self.errorMessage)
 
+    HotKeyManager.shared.toggleAction = {
+      NSApp.terminate(nil)
+    }
+    HotKeyManager.shared.register()
+
     self.refreshConfig()
     self.openConfigWindow()
   }
@@ -300,6 +306,44 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     window.makeKeyAndOrderFront(nil)
     NSApp.activate(ignoringOtherApps: true)
+  }
+}
+
+class HotKeyManager {
+  static let shared = HotKeyManager()
+  var toggleAction: (() -> Void)?
+
+  private var hotKeyRef: EventHotKeyRef?
+
+  func register() {
+    var hotKeyID = EventHotKeyID()
+    hotKeyID.signature = OSType(fourCharCode: "SHAD")
+    hotKeyID.id = 1
+    
+    // kVK_ANSI_S = 0x01
+    let modifiers = UInt32(cmdKey | controlKey)
+    let keyCode = UInt32(0x01)
+    
+    RegisterEventHotKey(keyCode, modifiers, hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
+    
+    var eventSpec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+    
+    let handler: EventHandlerUPP = { (nextHandler, theEvent, userData) -> OSStatus in
+      HotKeyManager.shared.toggleAction?()
+      return noErr
+    }
+    
+    InstallEventHandler(GetApplicationEventTarget(), handler, 1, &eventSpec, nil, nil)
+  }
+}
+
+extension OSType {
+  init(fourCharCode: String) {
+    var result: UInt32 = 0
+    for char in fourCharCode.utf8 {
+      result = (result << 8) + UInt32(char)
+    }
+    self = result
   }
 }
 
