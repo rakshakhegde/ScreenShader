@@ -35,9 +35,9 @@ class OverlayController: NSObject, MTKViewDelegate {
     )
     self.window.isOpaque = false
     self.window.backgroundColor = .clear
-    self.window.level = .screenSaver
+    self.window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.maximumWindow)))
     self.window.ignoresMouseEvents = true
-    self.window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+    self.window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
 
     let metalView = MetalView(frame: contentRect)
     metalView.delegate = self
@@ -118,7 +118,7 @@ class OverlayController: NSObject, MTKViewDelegate {
 
   func restartCapture() {
       self.screenCapture.restartCapture()
-      self.window.level = .screenSaver
+      self.window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.maximumWindow)))
       self.window.orderFrontRegardless()
   }
 
