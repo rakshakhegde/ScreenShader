@@ -2,7 +2,7 @@ import ScreenCaptureKit
 import AppKit
 import CoreGraphics
 
-class ScreenCapture {
+class ScreenCapture: NSObject, SCStreamDelegate {
   var config: Config! = nil
   var targetDisplayID: CGDirectDisplayID = 0
   var targetScaleFactor: CGFloat = 1.0
@@ -13,6 +13,11 @@ class ScreenCapture {
   private var stream: SCStream?
   private var streamOutput: StreamOutput?
   private let streamQueue = DispatchQueue(label: "ScreenCaptureKitStreamQueue")
+
+  func stream(_ stream: SCStream, didStopWithError error: Error) {
+    Logger.shared.log("ScreenCapture: Stream stopped with error: \(error.localizedDescription)")
+    self.restartCapture()
+  }
 
   func startCapture() {
     if self.capturing {
@@ -70,7 +75,7 @@ class ScreenCapture {
         streamConfig.capturesAudio = false
         streamConfig.showsCursor = false
 
-        self.stream = SCStream(filter: filter, configuration: streamConfig, delegate: nil)
+        self.stream = SCStream(filter: filter, configuration: streamConfig, delegate: self)
         self.streamOutput = StreamOutput(onFrameReceived: self.onFrameReceived)
 
         try self.stream!.addStreamOutput(

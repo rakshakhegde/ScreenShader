@@ -40,6 +40,13 @@ class ScreenManager: NSObject {
       object: nil
     )
     
+    NSWorkspace.shared.notificationCenter.addObserver(
+      self,
+      selector: #selector(handleSpaceChange),
+      name: NSWorkspace.activeSpaceDidChangeNotification,
+      object: nil
+    )
+    
     self.evaluateScreens(forceRestart: false)
   }
 
@@ -64,6 +71,16 @@ class ScreenManager: NSObject {
     }
     pendingScreenChange = workItem
     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: workItem)
+  }
+
+  @objc private func handleSpaceChange() {
+    Logger.shared.log("ScreenManager: Active space changed. Restarting capture.")
+    pendingScreenChange?.cancel()
+    let workItem = DispatchWorkItem { [weak self] in
+      self?.evaluateScreens(forceRestart: true)
+    }
+    pendingScreenChange = workItem
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: workItem)
   }
 
   private func evaluateScreens(forceRestart: Bool) {
