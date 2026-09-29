@@ -234,8 +234,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     if let button = self.statusItem.button {
       button.image = self.getMenuBarIcon()
-      button.action = #selector(self.toggleEffect)
+      button.action = #selector(self.statusBarButtonClicked(sender:))
+      button.sendAction(on: [.leftMouseUp, .rightMouseUp])
       button.target = self
+    }
+  }
+
+  @objc private func statusBarButtonClicked(sender: NSStatusBarButton) {
+    guard let event = NSApp.currentEvent else {
+      self.toggleEffect()
+      return
+    }
+    
+    if event.type == .rightMouseUp || event.modifierFlags.contains(.control) {
+      let menu = NSMenu()
+      menu.addItem(NSMenuItem(title: "Show window", action: #selector(self.openConfigWindow), keyEquivalent: ""))
+      menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApp.terminate(_:)), keyEquivalent: "q"))
+      
+      self.statusItem.menu = menu
+      self.statusItem.button?.performClick(nil)
+      self.statusItem.menu = nil
+    } else {
+      self.toggleEffect()
     }
   }
 
@@ -258,6 +278,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
   @objc private func openConfigWindow() {
     if self.configWindowController != nil {
       self.configWindowController!.window?.makeKeyAndOrderFront(nil)
+      NSApp.activate(ignoringOtherApps: true)
       return
     }
 
@@ -278,6 +299,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     self.configWindowController!.createUI()
 
     window.makeKeyAndOrderFront(nil)
+    NSApp.activate(ignoringOtherApps: true)
   }
 }
 
