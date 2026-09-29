@@ -70,9 +70,20 @@ class MetalRenderer {
       #include <metal_stdlib>
       using namespace metal;
 
+      struct TextureWrapper {
+        texture2d<float> tex;
+        float2 screenSize;
+
+        float4 sample(sampler s, float2 coord) const {
+          float2 pixelOffset = 2.0 / screenSize;
+          float2 insetCoord = clamp(coord, pixelOffset, 1.0 - pixelOffset);
+          return tex.sample(s, insetCoord);
+        }
+      };
+
       struct ShaderInput {
         // A texture containing the input screen capture data.
-        texture2d<float> inputTexture;
+        TextureWrapper inputTexture;
         // The texture coordinates for indexing into inputTexture at the current
         // position. The origin is at the top left of the screen.
         float2 texCoord;
@@ -129,7 +140,7 @@ class MetalRenderer {
         constant float *time [[buffer(2)]]
       ) {
         ShaderInput shaderInput;
-        shaderInput.inputTexture = inTexture;
+        shaderInput.inputTexture = TextureWrapper{inTexture, *screenSize};
         shaderInput.texCoord = in.texCoord;
         shaderInput.screenPosition = texToScreen(in.texCoord, *screenSize);
         shaderInput.screenSize = *screenSize;
