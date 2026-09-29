@@ -219,12 +219,14 @@ class MetalRenderer {
       return
     }
 
-    if let screen = NSScreen.main {
+    if let screen = window.screen {
 
       if let renderPipeline = self.renderPipeline {
         var screenSize = vector_float2(Float(screen.frame.width), Float(screen.frame.height))
+        let globalMouse = NSEvent.mouseLocation
         var mousePosition = vector_float2(
-          Float(NSEvent.mouseLocation.x), Float(NSEvent.mouseLocation.y))
+          Float(globalMouse.x - screen.frame.origin.x), 
+          Float(globalMouse.y - screen.frame.origin.y))
         var time = Float(ProcessInfo.processInfo.systemUptime)
 
         encoder.setRenderPipelineState(renderPipeline)
