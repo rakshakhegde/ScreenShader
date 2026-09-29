@@ -14,17 +14,18 @@ class OverlayController: NSObject, MTKViewDelegate {
   private var frameID: Int?
   private let dispatchQueue = DispatchQueue(label: "overlayController.queue")
 
-  init(config: Config, metrics: Metrics, errorMessage: ErrorMessage) {
+  private var targetScreen: NSScreen
+  private var targetDisplayID: CGDirectDisplayID
+
+  init(targetScreen: NSScreen, targetDisplayID: CGDirectDisplayID, config: Config, metrics: Metrics, errorMessage: ErrorMessage) {
+    self.targetScreen = targetScreen
+    self.targetDisplayID = targetDisplayID
     self.config = config
     self.metrics = metrics
     self.errorMessage = errorMessage
     super.init()
 
-    guard let screen = NSScreen.main else {
-      fatalError("No main screen found")
-    }
-
-    let contentRect = screen.frame
+    let contentRect = self.targetScreen.frame
 
     self.window = NSWindow(
       contentRect: contentRect,
@@ -41,55 +42,22 @@ class OverlayController: NSObject, MTKViewDelegate {
     let metalView = MetalView(frame: contentRect)
     metalView.delegate = self
     metalView.wantsLayer = true
+    metalView.isPaused = false
+    metalView.enableSetNeedsDisplay = false
     self.window.contentView = metalView
     self.window.makeKeyAndOrderFront(nil)
 
-    self.renderer = self.makeRendererForCurrentScreen(metalLayer: metalView.metalLayer)
+    self.renderer = self.makeRenderer(metalLayer: metalView.metalLayer)
 
     self.screenCapture = ScreenCapture()
     self.screenCapture.config = self.config
+    self.screenCapture.targetDisplayID = self.targetDisplayID
+    self.screenCapture.targetScaleFactor = self.targetScreen.backingScaleFactor
+    self.screenCapture.targetColorSpaceName = self.targetScreen.colorSpace?.cgColorSpace?.name
     self.screenCapture.excludedWindowIDs = [CGWindowID(self.window.windowNumber)]
     self.screenCapture.onFrameReceived = { [weak self] contentBuffer in
       self?.receiveFrame(contentBuffer: contentBuffer)
     }
-
-    NotificationCenter.default.addObserver(
-      self,
-      selector: #selector(handleScreenChange),
-      name: NSApplication.didChangeScreenParametersNotification,
-      object: nil
-    )
-
-    // Handle sleep/wake - listen to multiple notifications
-    NSWorkspace.shared.notificationCenter.addObserver(
-      self,
-      selector: #selector(handleWake),
-      name: NSWorkspace.didWakeNotification,
-      object: nil
-    )
-
-    NSWorkspace.shared.notificationCenter.addObserver(
-      self,
-      selector: #selector(handleScreensWake),
-      name: NSWorkspace.screensDidWakeNotification,
-      object: nil
-    )
-
-    // Also listen for app becoming active (might be more reliable)
-    NotificationCenter.default.addObserver(
-      self,
-      selector: #selector(handleAppDidBecomeActive),
-      name: NSApplication.didBecomeActiveNotification,
-      object: nil
-    )
-
-    // Log when screens sleep to confirm notifications work
-    NSWorkspace.shared.notificationCenter.addObserver(
-      self,
-      selector: #selector(handleScreensSleep),
-      name: NSWorkspace.screensDidSleepNotification,
-      object: nil
-    )
   }
 
   private func usesSRGBTransfer(colorSpaceName: CFString?) -> Bool {
@@ -100,16 +68,12 @@ class OverlayController: NSObject, MTKViewDelegate {
       || name == CGColorSpace.extendedDisplayP3
   }
 
-  private func makeRendererForCurrentScreen(metalLayer: CAMetalLayer) -> MetalRenderer {
-    // Prefer the actual screen the window is on when available.
-    let screen = self.window.screen ?? NSScreen.main
-
-    // Fall back to sRGB if AppKit doesn't provide a color space.
+  private func makeRenderer(metalLayer: CAMetalLayer) -> MetalRenderer {
     let screenColorSpace: CGColorSpace =
-      (screen?.colorSpace?.cgColorSpace) ?? (CGColorSpace(name: CGColorSpace.sRGB)!)
+      (self.targetScreen.colorSpace?.cgColorSpace) ?? (CGColorSpace(name: CGColorSpace.sRGB)!)
 
     let colorSpaceName = screenColorSpace.name
-    let wantsEDR = (screen?.maximumPotentialExtendedDynamicRangeColorComponentValue ?? 1.0) > 1.0
+    let wantsEDR = (self.targetScreen.maximumPotentialExtendedDynamicRangeColorComponentValue) > 1.0
     let srgbTransfer = usesSRGBTransfer(colorSpaceName: colorSpaceName)
 
     let drawablePixelFormat: MTLPixelFormat = {
@@ -121,7 +85,7 @@ class OverlayController: NSObject, MTKViewDelegate {
 
     let captureTexturePixelFormat: MTLPixelFormat = srgbTransfer ? .bgra8Unorm_srgb : .bgra8Unorm
 
-    let screenName = screen?.localizedName ?? "(unknown)"
+    let screenName = self.targetScreen.localizedName
     let csNameString = colorSpaceName.map { $0 as String } ?? "(nil)"
     Logger.shared.log(
       "display config: screen=\(screenName), colorSpaceName=\(csNameString), wantsEDR=\(wantsEDR), drawablePF=\(pixelFormatName(drawablePixelFormat)), captureTexPF=\(pixelFormatName(captureTexturePixelFormat))"
@@ -142,107 +106,20 @@ class OverlayController: NSObject, MTKViewDelegate {
       case .bgra8Unorm_srgb:  return ".bgra8Unorm_srgb"
       case .bgra10_xr:        return ".bgra10_xr"
       case .bgra10_xr_srgb:   return ".bgra10_xr_srgb"
-      // add more cases as needed
       default:                return "unknown(\(format.rawValue))"
       }
   }
 
-  @objc private func handleWake() {
-    Logger.shared.log("handleWake: System woke from sleep")
-    triggerRebuild()
+  func stopAndTearDown() {
+      self.screenCapture.stopCapture()
+      self.window.orderOut(nil)
+      self.window = nil
   }
 
-  @objc private func handleScreensWake() {
-    Logger.shared.log("handleScreensWake: Screens woke up")
-    lastScreenConfig = ""
-    triggerRebuild()
-  }
-
-  @objc private func handleScreensSleep() {
-    Logger.shared.log("handleScreensSleep: Screens going to sleep")
-  }
-
-  @objc private func handleAppDidBecomeActive() {
-    Logger.shared.log("handleAppDidBecomeActive: App became active")
-    triggerRebuild()
-  }
-
-  private func triggerRebuild() {
-    // Reset config to force rebuild
-    // Use debounced screen change handler
-    handleScreenChange()
-  }
-
-  private var pendingScreenChange: DispatchWorkItem?
-  private var lastScreenConfig: String = ""
-
-  @objc private func handleScreenChange() {
-    // Debounce: cancel pending and schedule new
-    pendingScreenChange?.cancel()
-    let workItem = DispatchWorkItem { [weak self] in
-      self?.applyScreenChange()
-    }
-    pendingScreenChange = workItem
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
-  }
-
-  private func applyScreenChange() {
-    guard let screen = NSScreen.main else {
-      Logger.shared.log("applyScreenChange: No main screen found")
-      return
-    }
-
-    // Check if config actually changed
-    let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID ?? 0
-    let newConfig = "\(displayID)-\(screen.frame)-\(screen.backingScaleFactor)"
-    
-    Logger.shared.log("applyScreenChange: lastScreenConfig: \(lastScreenConfig);; newConfig: \(newConfig)")
-    
-    if newConfig == lastScreenConfig {
-      Logger.shared.log("applyScreenChange: Config unchanged, skipping")
-      return
-    }
-    lastScreenConfig = newConfig
-
-    Logger.shared.log("applyScreenChange: displayID=\(displayID), frame=\(screen.frame), scale=\(screen.backingScaleFactor)")
-
-    // Stop capture first
-    screenCapture.stopCapture()
-
-    // Recreate Metal view fresh for the new screen
-    let contentRect = screen.frame
-
-    let metalView = MetalView(frame: contentRect)
-    metalView.delegate = self
-    metalView.wantsLayer = true
-    metalView.isPaused = false
-    metalView.enableSetNeedsDisplay = false  // Use internal display link
-
-    // Update window
-    window.contentView = metalView
-    window.setFrame(contentRect, display: true)
-
-    // Recreate renderer for the new Metal layer (match current display)
-    self.renderer = self.makeRendererForCurrentScreen(metalLayer: metalView.metalLayer)
-
-    // Reapply current effect
-    let activeEffect = self.config.effects.getActiveEffect()
-    if let effect = activeEffect {
-      let shader = self.config.effects.getShader(effect: effect)
-      try? self.renderer.setEffectSource(shader)
-    }
-
-    // Restart capture
-    screenCapture.excludedWindowIDs = [CGWindowID(self.window.windowNumber)]
-    screenCapture.startCapture()
-
-    // Re-assert window properties (may be lost after sleep/wake)
-    window.level = .screenSaver
-    window.isOpaque = false
-    window.backgroundColor = .clear
-    window.orderFrontRegardless()
-
-    Logger.shared.log("applyScreenChange: Rebuilt Metal view and renderer, re-asserted window properties")
+  func restartCapture() {
+      self.screenCapture.restartCapture()
+      self.window.level = .screenSaver
+      self.window.orderFrontRegardless()
   }
 
   func receiveFrame(contentBuffer: CVPixelBuffer) {

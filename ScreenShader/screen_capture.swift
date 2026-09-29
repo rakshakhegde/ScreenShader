@@ -4,6 +4,9 @@ import CoreGraphics
 
 class ScreenCapture {
   var config: Config! = nil
+  var targetDisplayID: CGDirectDisplayID = 0
+  var targetScaleFactor: CGFloat = 1.0
+  var targetColorSpaceName: CFString? = nil
   var excludedWindowIDs: [CGWindowID] = []
   var onFrameReceived: (CVPixelBuffer) -> Void = { _ in }
   private var capturing: Bool = false
@@ -32,18 +35,8 @@ class ScreenCapture {
           Logger.shared.log("  - displayID: \(displayID), frame: \(screen.frame), isMain: \(screen == NSScreen.main)")
         }
 
-        // Find the display matching NSScreen.main
-        guard let mainScreen = NSScreen.main,
-              let mainDisplayID = mainScreen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else {
-          Logger.shared.log("startCapture: No main screen found, skipping capture.")
-          self.capturing = false
-          return
-        }
-
-        Logger.shared.log("startCapture: Main screen displayID: \(mainDisplayID), frame: \(mainScreen.frame)")
-
-        guard let display = content.displays.first(where: { $0.displayID == mainDisplayID }) ?? content.displays.first else {
-          Logger.shared.log("startCapture: No displays found, skipping capture.")
+        guard let display = content.displays.first(where: { $0.displayID == self.targetDisplayID }) else {
+          Logger.shared.log("startCapture: Target displayID \(self.targetDisplayID) not found in SCShareableContent, skipping capture.")
           self.capturing = false
           return
         }
@@ -55,7 +48,7 @@ class ScreenCapture {
         }
         let filter = SCContentFilter(display: display, excludingWindows: excludedWindows)
 
-        let scaleFactor = mainScreen.backingScaleFactor
+        let scaleFactor = self.targetScaleFactor
 
         let streamConfig = SCStreamConfiguration()
         streamConfig.width = Int(CGFloat(display.width) * scaleFactor)
@@ -65,12 +58,11 @@ class ScreenCapture {
           value: 1, timescale: CMTimeScale(self.config.targetFPS))
         streamConfig.pixelFormat = kCVPixelFormatType_32BGRA
 
-        if let cgcs = mainScreen.colorSpace?.cgColorSpace,
-           let csName = cgcs.name {
+        if let csName = self.targetColorSpaceName {
           streamConfig.colorSpaceName = csName
           Logger.shared.log("startCapture: Set streamConfig.colorSpaceName=\(csName as String)")
         } else {
-          Logger.shared.log("startCapture: No named colorspace for mainScreen; leaving streamConfig.colorSpaceName unset")
+          Logger.shared.log("startCapture: No named colorspace provided; leaving streamConfig.colorSpaceName unset")
         }
 
         Logger.shared.log("startCapture: streamConfig.pixelFormat=\(streamConfig.pixelFormat)")

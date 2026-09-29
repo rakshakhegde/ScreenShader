@@ -2,13 +2,133 @@ import AppKit
 import CoreGraphics
 import Sparkle
 
+class ScreenManager: NSObject {
+  private var config: Config
+  private var metrics: Metrics
+  private var errorMessage: ErrorMessage
+  
+  private var overlayControllers: [CGDirectDisplayID: OverlayController] = [:]
+  private var screenSignatures: [CGDirectDisplayID: String] = [:]
+  
+  private var pendingScreenChange: DispatchWorkItem?
+
+  init(config: Config, metrics: Metrics, errorMessage: ErrorMessage) {
+    self.config = config
+    self.metrics = metrics
+    self.errorMessage = errorMessage
+    super.init()
+    
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(handleScreenChange),
+      name: NSApplication.didChangeScreenParametersNotification,
+      object: nil
+    )
+
+    NSWorkspace.shared.notificationCenter.addObserver(
+      self,
+      selector: #selector(handleWake),
+      name: NSWorkspace.didWakeNotification,
+      object: nil
+    )
+
+    NSWorkspace.shared.notificationCenter.addObserver(
+      self,
+      selector: #selector(handleWake),
+      name: NSWorkspace.screensDidWakeNotification,
+      object: nil
+    )
+    
+    self.evaluateScreens(forceRestart: false)
+  }
+
+  private func getScreenSignature(displayID: CGDirectDisplayID, screen: NSScreen) -> String {
+    return "\(displayID)-\(screen.frame)-\(screen.backingScaleFactor)"
+  }
+
+  @objc private func handleScreenChange() {
+    pendingScreenChange?.cancel()
+    let workItem = DispatchWorkItem { [weak self] in
+      self?.evaluateScreens(forceRestart: false)
+    }
+    pendingScreenChange = workItem
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: workItem)
+  }
+  
+  @objc private func handleWake() {
+    Logger.shared.log("ScreenManager: Wake detected. Debouncing and evaluating screens.")
+    pendingScreenChange?.cancel()
+    let workItem = DispatchWorkItem { [weak self] in
+      self?.evaluateScreens(forceRestart: true)
+    }
+    pendingScreenChange = workItem
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: workItem)
+  }
+
+  private func evaluateScreens(forceRestart: Bool) {
+    Logger.shared.log("ScreenManager: Evaluating screens. forceRestart=\(forceRestart)")
+    
+    var currentDisplayIDs = Set<CGDirectDisplayID>()
+    
+    for screen in NSScreen.screens {
+      guard let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else {
+        continue
+      }
+      
+      currentDisplayIDs.insert(displayID)
+      let newSignature = getScreenSignature(displayID: displayID, screen: screen)
+      let oldSignature = screenSignatures[displayID]
+      
+      if newSignature != oldSignature {
+        Logger.shared.log("ScreenManager: Screen \(displayID) signature changed or new. Rebuilding.")
+        
+        if let existingController = overlayControllers[displayID] {
+            existingController.stopAndTearDown()
+        }
+        
+        let newController = OverlayController(
+            targetScreen: screen,
+            targetDisplayID: displayID,
+            config: self.config,
+            metrics: self.metrics,
+            errorMessage: self.errorMessage
+        )
+        
+        overlayControllers[displayID] = newController
+        screenSignatures[displayID] = newSignature
+      } else if forceRestart {
+        Logger.shared.log("ScreenManager: Screen \(displayID) unchanged, but forceRestart requested.")
+        overlayControllers[displayID]?.restartCapture()
+      }
+    }
+    
+    // Clean up disconnected screens
+    let disconnectedIDs = Set(overlayControllers.keys).subtracting(currentDisplayIDs)
+    for id in disconnectedIDs {
+      Logger.shared.log("ScreenManager: Screen \(id) disconnected. Tearing down.")
+      overlayControllers[id]?.stopAndTearDown()
+      overlayControllers.removeValue(forKey: id)
+      screenSignatures.removeValue(forKey: id)
+    }
+    
+    // Always refresh config after evaluating to ensure shaders are active and captures start
+    self.refreshConfig()
+  }
+
+  func refreshConfig() {
+    for (_, controller) in overlayControllers {
+      controller.refreshConfig()
+    }
+  }
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate {
   private var updaterController: SPUStandardUpdaterController!
   private var config: Config!
   private var configChanged: Bool = false
   private var metrics: Metrics = Metrics()
   private var errorMessage: ErrorMessage = ErrorMessage()
-  private var overlayController: OverlayController!
+  private var screenManager: ScreenManager!
   private var statusItem: NSStatusItem!
   private var configWindowController: ConfigWindowController?
 
@@ -40,8 +160,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     setupMenuBar()
     createMenuBarIcon()
 
-    self.overlayController = OverlayController(
-      config: self.config, metrics: self.metrics, errorMessage: self.errorMessage)
+    self.screenManager = ScreenManager(config: self.config, metrics: self.metrics, errorMessage: self.errorMessage)
 
     self.refreshConfig()
     self.openConfigWindow()
@@ -56,7 +175,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
   private func refreshConfig() {
     self.statusItem.button?.image = self.getMenuBarIcon()
 
-    self.overlayController.refreshConfig()
+    self.screenManager.refreshConfig()
     self.configWindowController?.refreshActiveEffects()
 
     // Indicate that the config should be saved to disk.
