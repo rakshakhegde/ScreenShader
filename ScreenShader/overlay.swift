@@ -33,14 +33,14 @@ class OverlayController: NSObject, MTKViewDelegate {
       backing: .buffered,
       defer: false
     )
+    let panel = self.window as! NSPanel
+    panel.isFloatingPanel = true
+    
     self.window.isOpaque = false
     self.window.backgroundColor = .clear
     self.window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.maximumWindow)))
     self.window.ignoresMouseEvents = true
     self.window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary, .transient]
-
-    let panel = self.window as! NSPanel
-    panel.isFloatingPanel = true
 
     let metalView = MetalView(frame: contentRect)
     metalView.delegate = self
