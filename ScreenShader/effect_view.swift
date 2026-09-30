@@ -25,7 +25,7 @@ class EffectViewController: NSViewController, NSTextFieldDelegate, NSTextViewDel
 
     self.stackView = NSStackView()
     self.stackView.orientation = .vertical
-    self.stackView.spacing = 10
+    self.stackView.spacing = 16
     self.stackView.alignment = .leading
     self.stackView.translatesAutoresizingMaskIntoConstraints = false
     self.view.addSubview(self.stackView)
@@ -98,10 +98,10 @@ class EffectViewController: NSViewController, NSTextFieldDelegate, NSTextViewDel
     self.stackView.addArrangedSubview(self.saveButton)
 
     NSLayoutConstraint.activate([
-      self.stackView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor, constant: 10),
-      self.stackView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor, constant: -10),
-      self.stackView.topAnchor.constraint(equalTo: self.view.topAnchor, constant: 10),
-      self.stackView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor, constant: -10),
+      self.stackView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor, constant: 16),
+      self.stackView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor, constant: -16),
+      self.stackView.topAnchor.constraint(equalTo: self.view.topAnchor, constant: 16),
+      self.stackView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor, constant: -16),
 
       self.shaderField.heightAnchor.constraint(greaterThanOrEqualToConstant: 200),
     ])

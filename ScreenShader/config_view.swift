@@ -22,7 +22,7 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
 
     let tabsPane = NSStackView()
     tabsPane.orientation = .vertical
-    tabsPane.spacing = 10
+    tabsPane.spacing = 16
     tabsPane.translatesAutoresizingMaskIntoConstraints = false
 
     self.tableView = NSTableView()
@@ -30,6 +30,11 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
     self.tableView.dataSource = self
     self.tableView.headerView = nil
     self.tableView.focusRingType = .none
+    if #available(macOS 11.0, *) {
+        self.tableView.style = .sourceList
+    }
+    self.tableView.rowHeight = 32
+    self.tableView.intercellSpacing = NSSize(width: 0, height: 8)
 
     let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("Tabs"))
     column.title = "Tabs"
@@ -72,11 +77,11 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
     NSLayoutConstraint.activate([
       scrollView.heightAnchor.constraint(greaterThanOrEqualToConstant: 200),
 
-      self.errorMessageField.leftAnchor.constraint(equalTo: tabsPane.leftAnchor, constant: 10),
-      self.errorMessageField.rightAnchor.constraint(equalTo: tabsPane.rightAnchor, constant: -10),
+      self.errorMessageField.leftAnchor.constraint(equalTo: tabsPane.leftAnchor, constant: 16),
+      self.errorMessageField.rightAnchor.constraint(equalTo: tabsPane.rightAnchor, constant: -16),
 
       self.newEffectButton.heightAnchor.constraint(equalToConstant: 30),
-      self.newEffectButton.bottomAnchor.constraint(equalTo: tabsPane.bottomAnchor, constant: -10),
+      self.newEffectButton.bottomAnchor.constraint(equalTo: tabsPane.bottomAnchor, constant: -16),
 
       self.contentPane.topAnchor.constraint(equalTo: splitView.topAnchor),
       self.contentPane.bottomAnchor.constraint(equalTo: splitView.bottomAnchor),
@@ -118,13 +123,57 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
     return self.effects.effectList().count
   }
 
-  func tableView(_ tableView: NSTableView, objectValueFor tableColumn: NSTableColumn?, row: Int)
-    -> Any?
-  {
+  func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
     let effect = self.effects.effectList()[row]
     let name = self.effects.getName(effect: effect)
     let isActive = self.effects.isActive(effect: effect)
-    return isActive ? "\(name) (active)" : name
+
+    let identifier = NSUserInterfaceItemIdentifier("EffectCell")
+    var cellView = tableView.makeView(withIdentifier: identifier, owner: self) as? NSTableCellView
+
+    if cellView == nil {
+      cellView = NSTableCellView()
+      cellView?.identifier = identifier
+      
+      let checkbox = NSButton(checkboxWithTitle: "", target: self, action: #selector(toggleActiveFromList(_:)))
+      checkbox.translatesAutoresizingMaskIntoConstraints = false
+      checkbox.identifier = NSUserInterfaceItemIdentifier("ActiveCheckbox")
+      
+      let textField = NSTextField(labelWithString: "")
+      textField.translatesAutoresizingMaskIntoConstraints = false
+      textField.font = NSFont.systemFont(ofSize: 14)
+      textField.identifier = NSUserInterfaceItemIdentifier("NameField")
+      
+      cellView?.addSubview(checkbox)
+      cellView?.addSubview(textField)
+      cellView?.textField = textField
+      
+      NSLayoutConstraint.activate([
+        textField.leadingAnchor.constraint(equalTo: cellView!.leadingAnchor, constant: 8),
+        textField.centerYAnchor.constraint(equalTo: cellView!.centerYAnchor),
+        
+        checkbox.leadingAnchor.constraint(greaterThanOrEqualTo: textField.trailingAnchor, constant: 8),
+        checkbox.trailingAnchor.constraint(equalTo: cellView!.trailingAnchor, constant: -8),
+        checkbox.centerYAnchor.constraint(equalTo: cellView!.centerYAnchor)
+      ])
+    }
+    
+    if let checkbox = cellView?.subviews.first(where: { $0.identifier?.rawValue == "ActiveCheckbox" }) as? NSButton {
+      checkbox.state = isActive ? .on : .off
+      checkbox.tag = row
+    }
+    cellView?.textField?.stringValue = name
+    
+    return cellView
+  }
+
+  @objc private func toggleActiveFromList(_ sender: NSButton) {
+    let row = sender.tag
+    guard row >= 0 && row < self.effects.effectList().count else { return }
+    let effect = self.effects.effectList()[row]
+    self.effects.toggleActive(effect: effect)
+    self.refreshActiveEffects()
+    self.onConfigUpdate()
   }
 
   func tableViewSelectionDidChange(_ notification: Notification) {
@@ -153,7 +202,6 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
     } else {
       self.contentPane.subviews = []
     }
-    self.tableView.reloadData()
   }
 
   func refreshActiveEffects() {
