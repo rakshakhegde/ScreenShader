@@ -176,6 +176,7 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
     guard row >= 0 && row < self.effects.effectList().count else { return }
     let effect = self.effects.effectList()[row]
     self.effects.toggleActive(effect: effect)
+    self.selectTab(index: row)
     self.refreshActiveEffects()
     self.onConfigUpdate()
   }
@@ -209,7 +210,14 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
   }
 
   func refreshActiveEffects() {
-    self.tableView.reloadData()
+    for row in 0..<self.tableView.numberOfRows {
+      if let cellView = self.tableView.view(atColumn: 0, row: row, makeIfNecessary: false) as? NSTableCellView {
+        if let checkbox = cellView.subviews.first(where: { $0.identifier?.rawValue == "ActiveCheckbox" }) as? NSButton {
+           let effect = self.effects.effectList()[row]
+           checkbox.state = self.effects.isActive(effect: effect) ? .on : .off
+        }
+      }
+    }
     for controller in self.effectToController.values {
       controller.refreshActiveCheckbox()
     }
