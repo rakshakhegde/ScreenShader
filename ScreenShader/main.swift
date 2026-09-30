@@ -311,7 +311,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
       backing: .buffered,
       defer: false
     )
-    window.center()
+    window.setFrameAutosaveName("ScreenShaderMainWindow")
 
     self.configWindowController = ConfigWindowController(window: window)
     self.configWindowController!.config = self.config

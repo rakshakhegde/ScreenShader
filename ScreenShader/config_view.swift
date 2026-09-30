@@ -235,6 +235,7 @@ class ConfigWindowController: NSWindowController {
     guard let window = self.window else { return }
 
     window.title = "ScreenShader Settings"
+    window.setFrameAutosaveName("ScreenShaderMainWindow")
 
     self.configViewController.config = self.config
     self.configViewController.onConfigUpdate = self.onConfigUpdate
