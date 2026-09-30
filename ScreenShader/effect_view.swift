@@ -1,8 +1,18 @@
 import AppKit
 
 class SourceTextView: NSTextView {
+  var onSaveCmd: (() -> Void)? = nil
+
   override func insertTab(_ sender: Any?) {
     self.insertText("  ", replacementRange: self.selectedRange())
+  }
+
+  override func performKeyEquivalent(with event: NSEvent) -> Bool {
+    if event.type == .keyDown && event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "s" {
+      self.onSaveCmd?()
+      return true
+    }
+    return super.performKeyEquivalent(with: event)
   }
 }
 
@@ -72,7 +82,11 @@ class EffectViewController: NSViewController, NSTextFieldDelegate, NSTextViewDel
     self.stackView.addArrangedSubview(horizontalStack)
 
 
-    self.shaderField = SourceTextView()
+    let sourceTextView = SourceTextView()
+    sourceTextView.onSaveCmd = { [weak self] in
+      self?.onSaveButton()
+    }
+    self.shaderField = sourceTextView
     self.shaderField.isEditable = true
     self.shaderField.isVerticallyResizable = true
     self.shaderField.isHorizontallyResizable = true
