@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>LSUIElement</key>
-	<true/>
+	<false/>
 	<key>SUFeedURL</key>
 	<string>https://github.com/branpk/ScreenShader/raw/main/releases/appcast.xml</string>
 	<key>SUPublicEDKey</key>

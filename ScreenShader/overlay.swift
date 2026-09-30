@@ -27,9 +27,9 @@ class OverlayController: NSObject, MTKViewDelegate {
 
     let contentRect = self.targetScreen.frame
 
-    self.window = NSWindow(
+    self.window = NSPanel(
       contentRect: contentRect,
-      styleMask: [.borderless],
+      styleMask: [.borderless, .nonactivatingPanel],
       backing: .buffered,
       defer: false
     )
@@ -38,6 +38,9 @@ class OverlayController: NSObject, MTKViewDelegate {
     self.window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.maximumWindow)))
     self.window.ignoresMouseEvents = true
     self.window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary, .transient]
+
+    let panel = self.window as! NSPanel
+    panel.isFloatingPanel = true
 
     let metalView = MetalView(frame: contentRect)
     metalView.delegate = self
