@@ -234,7 +234,7 @@ class ConfigWindowController: NSWindowController {
   func createUI() {
     guard let window = self.window else { return }
 
-    window.title = "ScreenShader Settings"
+    window.title = "ScreenShader"
     window.setFrameAutosaveName("ScreenShaderMainWindow")
 
     self.configViewController.config = self.config
