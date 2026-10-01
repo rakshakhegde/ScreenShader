@@ -38,6 +38,7 @@ class OverlayController: NSObject, MTKViewDelegate {
     
     self.window.isOpaque = false
     self.window.backgroundColor = .clear
+    self.window.hasShadow = false
     self.window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.maximumWindow)))
     self.window.ignoresMouseEvents = true
     self.window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary, .transient]
