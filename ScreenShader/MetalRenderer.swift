@@ -24,6 +24,7 @@ class MetalRenderer {
   private var passthroughPipeline: MTLRenderPipelineState? = nil
   private var cursorPipeline: MTLRenderPipelineState? = nil
   var cursorTracker: CursorTracker? = nil
+  var drawCustomCursor: Bool = true
   
   
   private var intermediateTexture: MTLTexture? = nil
@@ -313,7 +314,7 @@ class MetalRenderer {
                 encoder1.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
             }
             
-            if let cursorPipeline = self.cursorPipeline, let tracker = self.cursorTracker {
+            if self.drawCustomCursor, let cursorPipeline = self.cursorPipeline, let tracker = self.cursorTracker {
                 let cursorData = tracker.currentData
                 if let cursorTex = cursorData.texture {
                     let globalMouse = NSEvent.mouseLocation

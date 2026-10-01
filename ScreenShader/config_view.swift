@@ -11,8 +11,14 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
   private var tableView: NSTableView! = nil
   private var errorMessageField: NSTextField! = nil
   private var newEffectButton: NSButton! = nil
+  private var useCustomCursorCheckbox: NSButton! = nil
   private var contentPane: NSView! = nil
   private var effectToController: [UUID: EffectViewController] = [:]
+
+  @objc private func toggleUseCustomCursor() {
+    self.config.useCustomCursor = (self.useCustomCursorCheckbox.state == .on)
+    self.onConfigUpdate()
+  }
 
   override func loadView() {
     let splitView = NSSplitView()
@@ -65,9 +71,15 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
       title: "New Effect", target: self, action: #selector(self.newEffect))
     self.newEffectButton.translatesAutoresizingMaskIntoConstraints = false
 
+    self.useCustomCursorCheckbox = NSButton(
+      checkboxWithTitle: "Use custom cursor", target: self, action: #selector(self.toggleUseCustomCursor))
+    self.useCustomCursorCheckbox.state = self.config.useCustomCursor ? .on : .off
+    self.useCustomCursorCheckbox.translatesAutoresizingMaskIntoConstraints = false
+
     tabsPane.addArrangedSubview(scrollView)
     tabsPane.addArrangedSubview(self.errorMessageField)
     tabsPane.addArrangedSubview(self.newEffectButton)
+    tabsPane.addArrangedSubview(self.useCustomCursorCheckbox)
 
     self.contentPane = NSView()
 
@@ -81,7 +93,9 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
       self.errorMessageField.rightAnchor.constraint(equalTo: tabsPane.rightAnchor, constant: -16),
 
       self.newEffectButton.heightAnchor.constraint(equalToConstant: 30),
-      self.newEffectButton.bottomAnchor.constraint(equalTo: tabsPane.bottomAnchor, constant: -16),
+      self.useCustomCursorCheckbox.bottomAnchor.constraint(equalTo: tabsPane.bottomAnchor, constant: -16),
+      self.useCustomCursorCheckbox.leadingAnchor.constraint(equalTo: tabsPane.leadingAnchor, constant: 16),
+      self.newEffectButton.bottomAnchor.constraint(equalTo: self.useCustomCursorCheckbox.topAnchor, constant: -8),
 
       self.contentPane.topAnchor.constraint(equalTo: splitView.topAnchor),
       self.contentPane.bottomAnchor.constraint(equalTo: splitView.bottomAnchor),

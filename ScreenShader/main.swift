@@ -205,7 +205,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     self.screenManager.refreshConfig()
     self.configWindowController?.refreshActiveEffects()
     
-    if self.config.effects.anyEffectActive() {
+    if self.config.effects.anyEffectActive() && self.config.useCustomCursor {
       CursorHider.shared.startHiding()
     } else {
       CursorHider.shared.stopHiding()

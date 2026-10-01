@@ -170,6 +170,7 @@ class OverlayController: NSObject, MTKViewDelegate {
 
     do {
       try self.renderer.setEffectSource(activeEffectShader)
+      self.renderer.drawCustomCursor = self.config.useCustomCursor
       self.errorMessage.clear()
     } catch {
       print("Effect shader error: \(error.localizedDescription)")
