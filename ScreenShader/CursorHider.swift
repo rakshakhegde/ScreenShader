@@ -60,8 +60,16 @@ class CursorHider {
         enforceTimer?.invalidate()
         enforceTimer = nil
         
+        // Pop the transparent cursor
+        NSCursor.pop()
+        
+        // Push the arrow cursor so WindowServer applies it globally before we lose background privilege
+        NSCursor.arrow.push()
+        
         let cid = CGSMainConnectionID()
         _ = CGSSetConnectionProperty(cid, cid, "SetsCursorInBackground" as CFString, kCFBooleanFalse)
+        
+        // Now pop the arrow cursor so our stack is clean
         NSCursor.pop()
         
         _ = CGSSetDebugOptions(0)
@@ -70,5 +78,16 @@ class CursorHider {
             CGDisplayShowCursor(CGMainDisplayID())
         }
         hideCount = 0
+        
+        // Hard-reset the cursor connection
+        CGAssociateMouseAndMouseCursorPosition(0)
+        CGAssociateMouseAndMouseCursorPosition(1)
+        
+        // Force WindowServer to update the cursor visibility immediately
+        if let loc = CGEvent(source: nil)?.location {
+            let event = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: loc, mouseButton: .left)
+            event?.post(tap: .cghidEventTap)
+            CGWarpMouseCursorPosition(loc)
+        }
     }
 }
