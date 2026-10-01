@@ -115,7 +115,6 @@ class OverlayController: NSObject, MTKViewDelegate {
   }
 
   func stopAndTearDown() {
-      CGDisplayShowCursor(self.targetDisplayID)
       self.screenCapture.stopCapture()
       self.window.orderOut(nil)
       self.window = nil
@@ -179,12 +178,6 @@ class OverlayController: NSObject, MTKViewDelegate {
     // TODO: The window is briefly visible with the previous effect applied.
     self.window.setIsVisible(active)
     self.screenCapture.setCapturing(active)
-
-    if active {
-      CGDisplayHideCursor(self.targetDisplayID)
-    } else {
-      CGDisplayShowCursor(self.targetDisplayID)
-    }
 
     if let metalView = self.window.contentView as? MetalView {
       metalView.isPaused = !active
