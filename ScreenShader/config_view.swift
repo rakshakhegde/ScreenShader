@@ -105,8 +105,11 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
     tabsPane.addArrangedSubview(scrollView)
     tabsPane.addArrangedSubview(self.errorMessageField)
     tabsPane.addArrangedSubview(self.newEffectButton)
+    tabsPane.setCustomSpacing(12, after: self.newEffectButton)
     tabsPane.addArrangedSubview(self.useCustomCursorCheckbox)
+    tabsPane.setCustomSpacing(4, after: self.useCustomCursorCheckbox)
     tabsPane.addArrangedSubview(self.customCursorSliderStack)
+    tabsPane.edgeInsets = NSEdgeInsets(top: 0, left: 0, bottom: 20, right: 0)
 
     self.contentPane = NSView()
 
@@ -121,15 +124,11 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
 
       self.newEffectButton.heightAnchor.constraint(equalToConstant: 30),
       self.useCustomCursorCheckbox.heightAnchor.constraint(equalToConstant: 24),
+      self.useCustomCursorCheckbox.leadingAnchor.constraint(equalTo: tabsPane.leadingAnchor, constant: 18),
       
       self.customCursorSliderStack.heightAnchor.constraint(equalToConstant: 24),
-      self.customCursorSliderStack.bottomAnchor.constraint(equalTo: tabsPane.bottomAnchor, constant: -20),
       self.customCursorSliderStack.leadingAnchor.constraint(equalTo: tabsPane.leadingAnchor, constant: 36),
       self.customCursorSliderStack.trailingAnchor.constraint(equalTo: tabsPane.trailingAnchor, constant: -18),
-      
-      self.useCustomCursorCheckbox.bottomAnchor.constraint(equalTo: self.customCursorSliderStack.topAnchor, constant: -4),
-      self.useCustomCursorCheckbox.leadingAnchor.constraint(equalTo: tabsPane.leadingAnchor, constant: 18),
-      self.newEffectButton.bottomAnchor.constraint(equalTo: self.useCustomCursorCheckbox.topAnchor, constant: -12),
 
       self.contentPane.topAnchor.constraint(equalTo: splitView.topAnchor),
       self.contentPane.bottomAnchor.constraint(equalTo: splitView.bottomAnchor),
