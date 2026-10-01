@@ -37,6 +37,16 @@ class CursorTracker {
     private func updateCursor() {
         let cursor = fetchCurrentCursor()
         
+        // Hide cursor if idle for 3 seconds
+        let idleTime = CGEventSource.secondsSinceLastEventType(.hidSystemState, eventType: .mouseMoved)
+        if idleTime > 5 {
+            lock.lock()
+            self._activeTexture = nil
+            lock.unlock()
+            lastHash = 0 // reset hash so it re-renders when it wakes up
+            return
+        }
+        
         let newHash = cursor.image.tiffRepresentation?.hashValue ?? 0
         if newHash == lastHash {
             return
