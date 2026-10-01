@@ -182,20 +182,11 @@ class Config: Codable {
   var configVersion: Int = 1
   var effects: Effects = Effects()
   var targetFPS: Int = 60
-  var useCustomCursor: Bool = true
-
-  enum CodingKeys: String, CodingKey {
-    case configVersion, effects, targetFPS, useCustomCursor
-  }
-
-  init() {}
-
-  required init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    self.configVersion = try container.decodeIfPresent(Int.self, forKey: .configVersion) ?? 1
-    self.effects = try container.decodeIfPresent(Effects.self, forKey: .effects) ?? Effects()
-    self.targetFPS = try container.decodeIfPresent(Int.self, forKey: .targetFPS) ?? 60
-    self.useCustomCursor = try container.decodeIfPresent(Bool.self, forKey: .useCustomCursor) ?? true
+  
+  var _useCustomCursor: Bool?
+  var useCustomCursor: Bool {
+    get { return _useCustomCursor ?? true }
+    set { _useCustomCursor = newValue }
   }
 
   static func getFileURL() -> URL {

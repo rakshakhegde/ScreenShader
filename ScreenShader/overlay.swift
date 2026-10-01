@@ -52,7 +52,6 @@ class OverlayController: NSObject, MTKViewDelegate {
     self.window.makeKeyAndOrderFront(nil)
 
     self.renderer = self.makeRenderer(metalLayer: metalView.metalLayer)
-    self.renderer.cursorTracker = CursorTracker(device: self.renderer.device)
 
     self.screenCapture = ScreenCapture()
     self.screenCapture.config = self.config
@@ -170,7 +169,13 @@ class OverlayController: NSObject, MTKViewDelegate {
 
     do {
       try self.renderer.setEffectSource(activeEffectShader)
-      self.renderer.drawCustomCursor = self.config.useCustomCursor
+      
+      if self.config.useCustomCursor && self.renderer.cursorTracker == nil {
+          self.renderer.cursorTracker = CursorTracker(device: self.renderer.device)
+      } else if !self.config.useCustomCursor {
+          self.renderer.cursorTracker = nil
+      }
+      
       self.errorMessage.clear()
     } catch {
       print("Effect shader error: \(error.localizedDescription)")
