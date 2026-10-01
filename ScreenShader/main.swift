@@ -194,12 +194,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     self.openConfigWindow()
     return true
   }
+  
+  func applicationWillTerminate(_ notification: Notification) {
+    CursorHider.shared.stopHiding()
+  }
 
   private func refreshConfig() {
     self.statusItem.button?.image = self.getMenuBarIcon()
 
     self.screenManager.refreshConfig()
     self.configWindowController?.refreshActiveEffects()
+    
+    if self.config.effects.anyEffectActive() {
+      CursorHider.shared.startHiding()
+    } else {
+      CursorHider.shared.stopHiding()
+    }
 
     // Indicate that the config should be saved to disk.
     self.configChanged = true

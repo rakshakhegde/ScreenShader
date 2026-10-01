@@ -20,6 +20,7 @@
 		41C290E42D4B04A100675317 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 41C290E32D4B04A100675317 /* Sparkle */; };
 		AABBCC012D58000000000001 /* logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC002D58000000000001 /* logger.swift */; };
 		A1B2C3D4E5F6000000000002 /* CursorTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000001 /* CursorTracker.swift */; };
+		A1B2C3D4E5F6000000000004 /* CursorHider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000003 /* CursorHider.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -44,6 +45,7 @@
 		41C290E12D4AC88E00675317 /* select_activate.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = select_activate.png; sourceTree = "<group>"; };
 		AABBCC002D58000000000001 /* logger.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = logger.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000000000001 /* CursorTracker.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CursorTracker.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000000000003 /* CursorHider.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CursorHider.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -94,6 +96,8 @@
 				416975F22D497E21004C8E93 /* overlay.swift */,
 				416975EF2D497E21004C8E93 /* MetalRenderer.swift */,
 				A1B2C3D4E5F6000000000001 /* CursorTracker.swift */,
+				A1B2C3D4E5F6000000000003 /* CursorHider.swift */,
+
 				416975EE2D497E21004C8E93 /* screen_capture.swift */,
 			);
 			path = ScreenShader;
@@ -194,6 +198,8 @@
 				416975FD2D497E21004C8E93 /* error_message.swift in Sources */,
 				416975F92D497E21004C8E93 /* MetalRenderer.swift in Sources */,
 				A1B2C3D4E5F6000000000002 /* CursorTracker.swift in Sources */,
+				A1B2C3D4E5F6000000000004 /* CursorHider.swift in Sources */,
+
 				416975FA2D497E21004C8E93 /* config_view.swift in Sources */,
 				416975F62D497E21004C8E93 /* metrics.swift in Sources */,
 				416975FF2D497E21004C8E93 /* effect_view.swift in Sources */,
