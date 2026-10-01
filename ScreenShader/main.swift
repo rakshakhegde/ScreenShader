@@ -259,6 +259,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     editSubMenu.addItem(
       NSMenuItem(title: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
 
+    let windowMenu = NSMenuItem()
+    mainMenu.addItem(windowMenu)
+    let windowSubMenu = NSMenu(title: "Window")
+    windowMenu.submenu = windowSubMenu
+    windowSubMenu.addItem(NSMenuItem(title: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w"))
+
     NSApp.mainMenu = mainMenu
   }
 
