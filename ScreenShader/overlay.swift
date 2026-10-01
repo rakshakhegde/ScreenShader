@@ -51,7 +51,7 @@ class OverlayController: NSObject, MTKViewDelegate {
     self.window.makeKeyAndOrderFront(nil)
 
     self.renderer = self.makeRenderer(metalLayer: metalView.metalLayer)
-    self.renderer.cursorTracker = CursorTracker()
+    self.renderer.cursorTracker = CursorTracker(device: self.renderer.device)
 
     self.screenCapture = ScreenCapture()
     self.screenCapture.config = self.config

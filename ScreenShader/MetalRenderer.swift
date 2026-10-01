@@ -14,7 +14,7 @@ class MetalView: MTKView {
 }
 
 class MetalRenderer {
-  private let device: MTLDevice
+  let device: MTLDevice
   private let commandQueue: MTLCommandQueue
   private var textureCache: CVMetalTextureCache!
   
@@ -24,7 +24,7 @@ class MetalRenderer {
   private var passthroughPipeline: MTLRenderPipelineState? = nil
   private var cursorPipeline: MTLRenderPipelineState? = nil
   var cursorTracker: CursorTracker? = nil
-  private var cursorTextures: [String: MTLTexture] = [:]
+  
   
   private var intermediateTexture: MTLTexture? = nil
 
@@ -241,28 +241,7 @@ class MetalRenderer {
     return try device.makeRenderPipelineState(descriptor: pipelineDescriptor)
   }
 
-  private func getCursorTexture(cursor: NSCursor) -> MTLTexture? {
-    let key = "\(cursor.hash)"
-    if let tex = cursorTextures[key] { return tex }
-    
-    guard let tiffData = cursor.image.tiffRepresentation,
-          let bitmapRep = NSBitmapImageRep(data: tiffData) else { return nil }
-    
-    let width = bitmapRep.pixelsWide
-    let height = bitmapRep.pixelsHigh
-    guard width > 0 && height > 0 else { return nil }
-    
-    let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba8Unorm, width: width, height: height, mipmapped: false)
-    guard let texture = device.makeTexture(descriptor: descriptor) else { return nil }
-    
-    let bytesPerRow = bitmapRep.bytesPerRow
-    if let data = bitmapRep.bitmapData {
-        texture.replace(region: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0, withBytes: data, bytesPerRow: bytesPerRow)
-        cursorTextures[key] = texture
-        return texture
-    }
-    return nil
-  }
+
 
   func setEffectSource(_ effectSource: String?) throws {
     guard let effectSource = effectSource else {
@@ -335,19 +314,18 @@ class MetalRenderer {
             }
             
             if let cursorPipeline = self.cursorPipeline, let tracker = self.cursorTracker {
-                let cursorType = tracker.currentCursorType()
-                let cursor = cursorType.cursor
-                if let cursorTex = getCursorTexture(cursor: cursor) {
+                let cursorData = tracker.currentData
+                if let cursorTex = cursorData.texture {
                     let globalMouse = NSEvent.mouseLocation
                     let mx = Float(globalMouse.x - screen.frame.origin.x)
                     let my = Float(globalMouse.y - screen.frame.origin.y)
                     let sw = Float(screen.frame.width)
                     let sh = Float(screen.frame.height)
                     
-                    let cw_points = Float(cursor.image.size.width)
-                    let ch_points = Float(cursor.image.size.height)
-                    let hsX = Float(cursor.hotSpot.x)
-                    let hsY = Float(cursor.hotSpot.y)
+                    let cw_points = Float(cursorData.size.width)
+                    let ch_points = Float(cursorData.size.height)
+                    let hsX = Float(cursorData.hotSpot.x)
+                    let hsY = Float(cursorData.hotSpot.y)
                     
                     let ndcWidth = 2.0 / sw
                     let ndcHeight = 2.0 / sh

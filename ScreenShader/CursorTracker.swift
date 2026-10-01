@@ -1,151 +1,100 @@
 import AppKit
+import CoreGraphics
+import Metal
 import ApplicationServices
 
 class CursorTracker {
-    enum CursorType: String {
-        case arrow = "arrow"
-        case text = "text"
-        case pointer = "pointer"
-        case crosshair = "crosshair"
-        case openHand = "open-hand"
-        case closedHand = "closed-hand"
-        case resizeEW = "resize-ew"
-        case resizeNS = "resize-ns"
-        case notAllowed = "not-allowed"
+    private let device: MTLDevice
+    private let timer: DispatchSourceTimer
+    private var lastHash: Int = 0
+    
+    // Thread-safe state
+    private let lock = NSLock()
+    private var _activeTexture: MTLTexture?
+    private var _activeHotSpot: CGPoint = .zero
+    private var _activeSize: CGSize = .zero
+    
+    var currentData: (texture: MTLTexture?, hotSpot: CGPoint, size: CGSize) {
+        lock.lock()
+        defer { lock.unlock() }
+        return (_activeTexture, _activeHotSpot, _activeSize)
+    }
+    
+    init(device: MTLDevice) {
+        self.device = device
+        self.timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .userInteractive))
+        self.timer.schedule(deadline: .now(), repeating: .milliseconds(33)) // ~30Hz
+        self.timer.setEventHandler { [weak self] in
+            self?.updateCursor()
+        }
+        self.timer.resume()
+    }
+    
+    deinit {
+        timer.cancel()
+    }
+    
+    private func updateCursor() {
+        let cursor = fetchCurrentCursor()
         
-        var cursor: NSCursor {
-            switch self {
-            case .arrow: return .arrow
-            case .text: return .iBeam
-            case .pointer: return .pointingHand
-            case .crosshair: return .crosshair
-            case .openHand: return .openHand
-            case .closedHand: return .closedHand
-            case .resizeEW: return .resizeLeftRight
-            case .resizeNS: return .resizeUpDown
-            case .notAllowed: return .operationNotAllowed
+        let newHash = cursor.image.tiffRepresentation?.hashValue ?? 0
+        if newHash == lastHash {
+            return
+        }
+        
+        lastHash = newHash
+        let texture = createTexture(from: cursor)
+        
+        lock.lock()
+        self._activeTexture = texture
+        self._activeHotSpot = cursor.hotSpot
+        self._activeSize = cursor.image.size
+        lock.unlock()
+    }
+    
+    private func fetchCurrentCursor() -> NSCursor {
+        if #available(macOS 14.0, *) {
+            if let systemCursor = NSCursor.currentSystem {
+                return systemCursor
             }
         }
+        
+        let fallbackStr = accessibilityCursorMatch() ?? "arrow"
+        switch fallbackStr {
+        case "text": return .iBeam
+        case "pointer": return .pointingHand
+        case "crosshair": return .crosshair
+        case "open-hand": return .openHand
+        case "closed-hand": return .closedHand
+        case "resize-ew": return .resizeLeftRight
+        case "resize-ns": return .resizeUpDown
+        case "not-allowed": return .operationNotAllowed
+        default: return .arrow
+        }
     }
-
-    private let signatureAcceptanceThreshold = 12000
-    private let relaxedSignatureAcceptanceThresholds: [String: Int] = [
-        "text": 28000,
-        "crosshair": 32000,
-    ]
-    private let strictSignatureAcceptanceThresholds: [String: Int] = [
-        "open-hand": 3200,
-        "closed-hand": 3200,
-    ]
+    
+    private func createTexture(from cursor: NSCursor) -> MTLTexture? {
+        guard let tiffData = cursor.image.tiffRepresentation,
+              let bitmapRep = NSBitmapImageRep(data: tiffData) else { return nil }
+        
+        let width = bitmapRep.pixelsWide
+        let height = bitmapRep.pixelsHigh
+        guard width > 0 && height > 0 else { return nil }
+        
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba8Unorm, width: width, height: height, mipmapped: false)
+        guard let texture = device.makeTexture(descriptor: descriptor) else { return nil }
+        
+        let bytesPerRow = bitmapRep.bytesPerRow
+        if let data = bitmapRep.bitmapData {
+            texture.replace(region: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0, withBytes: data, bytesPerRow: bytesPerRow)
+            return texture
+        }
+        return nil
+    }
 
     private let systemWideElement = AXUIElementCreateSystemWide()
     private let totalScreenHeight = NSScreen.screens.reduce(CGFloat(0)) { max($0, $1.frame.maxY) }
-    private let axEditableAttribute = "AXEditable"
-    private let axLinkRole = "AXLink"
-
-    private struct CursorSignature {
-        let aspectRatio: Double
-        let hotspotXRatio: Double
-        let hotspotYRatio: Double
-        let shapeSamples: [UInt8]
-    }
-
-    private lazy var knownCursorSignatures: [(String, CursorSignature)] = {
-        var candidates: [(String, NSCursor)] = [
-            ("arrow", .arrow),
-            ("text", .iBeam),
-            ("pointer", .pointingHand),
-            ("pointer", .dragCopy),
-            ("pointer", .dragLink),
-            ("pointer", .contextualMenu),
-            ("crosshair", .crosshair),
-            ("open-hand", .openHand),
-            ("closed-hand", .closedHand),
-            ("resize-ew", .resizeLeft),
-            ("resize-ew", .resizeRight),
-            ("resize-ew", .resizeLeftRight),
-            ("resize-ns", .resizeUp),
-            ("resize-ns", .resizeDown),
-            ("resize-ns", .resizeUpDown),
-            ("not-allowed", .operationNotAllowed),
-        ]
-
-        if #available(macOS 10.13, *) {
-            candidates.append(("text", .iBeamCursorForVerticalLayout))
-        }
-
-        return candidates.compactMap { entry in
-            guard let cursorSignature = self.signature(for: entry.1) else { return nil }
-            return (entry.0, cursorSignature)
-        }
-    }()
-
-    private func signature(for cursor: NSCursor, sampleSize: Int = 32) -> CursorSignature? {
-        let image = cursor.image
-        let sourceSize = image.size
-        guard sourceSize.width > 0, sourceSize.height > 0 else { return nil }
-
-        guard let bitmap = NSBitmapImageRep(
-            bitmapDataPlanes: nil, pixelsWide: sampleSize, pixelsHigh: sampleSize,
-            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
-        ) else { return nil }
-        bitmap.size = NSSize(width: sampleSize, height: sampleSize)
-
-        NSGraphicsContext.saveGraphicsState()
-        guard let context = NSGraphicsContext(bitmapImageRep: bitmap) else {
-            NSGraphicsContext.restoreGraphicsState()
-            return nil
-        }
-        NSGraphicsContext.current = context
-        context.imageInterpolation = .high
-
-        let scale = min(CGFloat(sampleSize) / sourceSize.width, CGFloat(sampleSize) / sourceSize.height)
-        let drawWidth = sourceSize.width * scale
-        let drawHeight = sourceSize.height * scale
-        let drawRect = NSRect(
-            x: (CGFloat(sampleSize) - drawWidth) / 2,
-            y: (CGFloat(sampleSize) - drawHeight) / 2,
-            width: drawWidth, height: drawHeight
-        )
-        image.draw(in: drawRect, from: .zero, operation: .copy, fraction: 1)
-        context.flushGraphics()
-        NSGraphicsContext.restoreGraphicsState()
-
-        guard let data = bitmap.bitmapData else { return nil }
-
-        var alphaSamples: [UInt8] = []
-        alphaSamples.reserveCapacity(sampleSize * sampleSize)
-        let bytesPerRow = bitmap.bytesPerRow
-
-        for y in 0..<sampleSize {
-            for x in 0..<sampleSize {
-                let offset = y * bytesPerRow + x * 4
-                let alpha = data[offset + 3]
-                alphaSamples.append(alpha > 24 ? 255 : 0)
-            }
-        }
-
-        let hotspot = cursor.hotSpot
-        return CursorSignature(
-            aspectRatio: Double(sourceSize.width / max(1, sourceSize.height)),
-            hotspotXRatio: Double(hotspot.x / max(1, sourceSize.width)),
-            hotspotYRatio: Double(hotspot.y / max(1, sourceSize.height)),
-            shapeSamples: alphaSamples
-        )
-    }
-
-    private func signatureScore(_ lhs: CursorSignature, _ rhs: CursorSignature) -> Int {
-        let count = min(lhs.shapeSamples.count, rhs.shapeSamples.count)
-        var imageDifference = 0
-        for index in 0..<count {
-            imageDifference += abs(Int(lhs.shapeSamples[index]) - Int(rhs.shapeSamples[index]))
-        }
-        let aspectPenalty = Int(abs(lhs.aspectRatio - rhs.aspectRatio) * 1800)
-        let hotspotPenalty = Int((abs(lhs.hotspotXRatio - rhs.hotspotXRatio) + abs(lhs.hotspotYRatio - rhs.hotspotYRatio)) * 2200)
-        return imageDifference + aspectPenalty + hotspotPenalty
-    }
-
+    
     private func attributeString(_ element: AXUIElement, _ attribute: String) -> String? {
         var value: CFTypeRef?
         let error = AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
@@ -224,7 +173,7 @@ class CursorTracker {
     private func elementLooksTextual(_ element: AXUIElement) -> Bool {
         let role = attributeString(element, kAXRoleAttribute)
         let subrole = attributeString(element, kAXSubroleAttribute)
-        let editable = attributeBool(element, axEditableAttribute)
+        let editable = attributeBool(element, "AXEditable")
         let metadata = metadataString(for: element)
         let actions = actionNames(element)
 
@@ -272,7 +221,7 @@ class CursorTracker {
         }
 
         let pressableRoles: Set<String> = [
-            kAXButtonRole as String, axLinkRole, kAXMenuItemRole as String,
+            kAXButtonRole as String, "AXLink", kAXMenuItemRole as String,
             kAXPopUpButtonRole as String, kAXRadioButtonRole as String,
             kAXCheckBoxRole as String, kAXTabGroupRole as String,
         ]
@@ -285,43 +234,5 @@ class CursorTracker {
         }
 
         return nil
-    }
-
-    func currentCursorType() -> CursorType {
-        let resolvedCursor: NSCursor?
-        if #available(macOS 14.0, *) {
-            resolvedCursor = NSCursor.currentSystem ?? NSCursor.current
-        } else {
-            resolvedCursor = NSCursor.current
-        }
-
-        guard let resolvedCursor else {
-            return CursorType(rawValue: accessibilityCursorMatch() ?? "arrow") ?? .arrow
-        }
-
-        guard let currentSignature = signature(for: resolvedCursor) else {
-            return CursorType(rawValue: accessibilityCursorMatch() ?? "arrow") ?? .arrow
-        }
-
-        guard let bestMatch = knownCursorSignatures.min(by: { lhs, rhs in
-            signatureScore(currentSignature, lhs.1) < signatureScore(currentSignature, rhs.1)
-        }) else {
-            return CursorType(rawValue: accessibilityCursorMatch() ?? "arrow") ?? .arrow
-        }
-
-        let bestScore = signatureScore(currentSignature, bestMatch.1)
-        let primaryThreshold = strictSignatureAcceptanceThresholds[bestMatch.0] ?? signatureAcceptanceThreshold
-        let matchedCursorType: String
-        if bestScore > primaryThreshold {
-            if let relaxedThreshold = relaxedSignatureAcceptanceThresholds[bestMatch.0], bestScore <= relaxedThreshold {
-                matchedCursorType = bestMatch.0
-            } else {
-                matchedCursorType = "arrow"
-            }
-        } else {
-            matchedCursorType = bestMatch.0
-        }
-
-        return CursorType(rawValue: matchedCursorType) ?? .arrow
     }
 }
