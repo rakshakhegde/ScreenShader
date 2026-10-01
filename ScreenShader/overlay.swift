@@ -175,10 +175,11 @@ class OverlayController: NSObject, MTKViewDelegate {
     }
 
     // TODO: The window is briefly visible with the previous effect applied.
-    // self.window.setIsVisible(active)
-    // self.screenCapture.setCapturing(active)
+    self.window.setIsVisible(active)
+    self.screenCapture.setCapturing(active)
 
-    self.window.setIsVisible(true)
-    self.screenCapture.setCapturing(true)
+    if let metalView = self.window.contentView as? MetalView {
+      metalView.isPaused = !active
+    }
   }
 }
