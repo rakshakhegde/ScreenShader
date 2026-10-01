@@ -12,11 +12,20 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
   private var errorMessageField: NSTextField! = nil
   private var newEffectButton: NSButton! = nil
   private var useCustomCursorCheckbox: NSButton! = nil
+  private var customCursorSlider: NSSlider! = nil
+  private var customCursorSliderLabel: NSTextField! = nil
+  private var customCursorSliderStack: NSStackView! = nil
   private var contentPane: NSView! = nil
   private var effectToController: [UUID: EffectViewController] = [:]
 
+  @objc private func onSliderChange() {
+    self.config.customCursorScale = Float(self.customCursorSlider.doubleValue)
+    self.onConfigUpdate()
+  }
+
   @objc private func toggleUseCustomCursor() {
     self.config.useCustomCursor = (self.useCustomCursorCheckbox.state == .on)
+    self.customCursorSliderStack.isHidden = !self.config.useCustomCursor
     self.onConfigUpdate()
   }
 
@@ -72,14 +81,32 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
     self.newEffectButton.translatesAutoresizingMaskIntoConstraints = false
 
     self.useCustomCursorCheckbox = NSButton(
-      checkboxWithTitle: "Use custom cursor", target: self, action: #selector(self.toggleUseCustomCursor))
+      checkboxWithTitle: "  Use custom cursor", target: self, action: #selector(self.toggleUseCustomCursor))
     self.useCustomCursorCheckbox.state = self.config.useCustomCursor ? .on : .off
     self.useCustomCursorCheckbox.translatesAutoresizingMaskIntoConstraints = false
+    self.useCustomCursorCheckbox.font = NSFont.systemFont(ofSize: 13) // Slightly larger text to balance
+
+    self.customCursorSlider = NSSlider(value: Double(self.config.customCursorScale), minValue: 1.0, maxValue: 4.0, target: self, action: #selector(self.onSliderChange))
+    self.customCursorSlider.isContinuous = true
+    self.customCursorSlider.translatesAutoresizingMaskIntoConstraints = false
+
+    self.customCursorSliderLabel = NSTextField(labelWithString: "Size:")
+    self.customCursorSliderLabel.font = NSFont.systemFont(ofSize: 13)
+    self.customCursorSliderLabel.translatesAutoresizingMaskIntoConstraints = false
+
+    self.customCursorSliderStack = NSStackView()
+    self.customCursorSliderStack.orientation = .horizontal
+    self.customCursorSliderStack.spacing = 8
+    self.customCursorSliderStack.translatesAutoresizingMaskIntoConstraints = false
+    self.customCursorSliderStack.addArrangedSubview(self.customCursorSliderLabel)
+    self.customCursorSliderStack.addArrangedSubview(self.customCursorSlider)
+    self.customCursorSliderStack.isHidden = !self.config.useCustomCursor
 
     tabsPane.addArrangedSubview(scrollView)
     tabsPane.addArrangedSubview(self.errorMessageField)
     tabsPane.addArrangedSubview(self.newEffectButton)
     tabsPane.addArrangedSubview(self.useCustomCursorCheckbox)
+    tabsPane.addArrangedSubview(self.customCursorSliderStack)
 
     self.contentPane = NSView()
 
@@ -93,9 +120,16 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
       self.errorMessageField.rightAnchor.constraint(equalTo: tabsPane.rightAnchor, constant: -16),
 
       self.newEffectButton.heightAnchor.constraint(equalToConstant: 30),
-      self.useCustomCursorCheckbox.bottomAnchor.constraint(equalTo: tabsPane.bottomAnchor, constant: -16),
-      self.useCustomCursorCheckbox.leadingAnchor.constraint(equalTo: tabsPane.leadingAnchor, constant: 16),
-      self.newEffectButton.bottomAnchor.constraint(equalTo: self.useCustomCursorCheckbox.topAnchor, constant: -8),
+      self.useCustomCursorCheckbox.heightAnchor.constraint(equalToConstant: 24),
+      
+      self.customCursorSliderStack.heightAnchor.constraint(equalToConstant: 24),
+      self.customCursorSliderStack.bottomAnchor.constraint(equalTo: tabsPane.bottomAnchor, constant: -20),
+      self.customCursorSliderStack.leadingAnchor.constraint(equalTo: tabsPane.leadingAnchor, constant: 36),
+      self.customCursorSliderStack.trailingAnchor.constraint(equalTo: tabsPane.trailingAnchor, constant: -18),
+      
+      self.useCustomCursorCheckbox.bottomAnchor.constraint(equalTo: self.customCursorSliderStack.topAnchor, constant: -4),
+      self.useCustomCursorCheckbox.leadingAnchor.constraint(equalTo: tabsPane.leadingAnchor, constant: 18),
+      self.newEffectButton.bottomAnchor.constraint(equalTo: self.useCustomCursorCheckbox.topAnchor, constant: -12),
 
       self.contentPane.topAnchor.constraint(equalTo: splitView.topAnchor),
       self.contentPane.bottomAnchor.constraint(equalTo: splitView.bottomAnchor),

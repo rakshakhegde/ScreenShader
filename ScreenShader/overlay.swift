@@ -175,6 +175,7 @@ class OverlayController: NSObject, MTKViewDelegate {
       } else if !self.config.useCustomCursor {
           self.renderer.cursorTracker = nil
       }
+      self.renderer.customCursorScale = self.config.customCursorScale
       
       self.errorMessage.clear()
     } catch {

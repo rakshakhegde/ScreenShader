@@ -188,6 +188,12 @@ class Config: Codable {
     get { return _useCustomCursor ?? true }
     set { _useCustomCursor = newValue }
   }
+  
+  var _customCursorScale: Float?
+  var customCursorScale: Float {
+    get { return _customCursorScale ?? 1.0 }
+    set { _customCursorScale = newValue }
+  }
 
   static func getFileURL() -> URL {
     let fileManager = FileManager.default

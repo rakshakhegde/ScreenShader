@@ -24,6 +24,7 @@ class MetalRenderer {
   private var passthroughPipeline: MTLRenderPipelineState? = nil
   private var cursorPipeline: MTLRenderPipelineState? = nil
   var cursorTracker: CursorTracker? = nil
+  var customCursorScale: Float = 1.0
   
   
   private var intermediateTexture: MTLTexture? = nil
@@ -322,10 +323,10 @@ class MetalRenderer {
                     let sw = Float(screen.frame.width)
                     let sh = Float(screen.frame.height)
                     
-                    let cw_points = Float(cursorData.size.width)
-                    let ch_points = Float(cursorData.size.height)
-                    let hsX = Float(cursorData.hotSpot.x)
-                    let hsY = Float(cursorData.hotSpot.y)
+                    let cw_points = Float(cursorData.size.width) * self.customCursorScale
+                    let ch_points = Float(cursorData.size.height) * self.customCursorScale
+                    let hsX = Float(cursorData.hotSpot.x) * self.customCursorScale
+                    let hsY = Float(cursorData.hotSpot.y) * self.customCursorScale
                     
                     let ndcWidth = 2.0 / sw
                     let ndcHeight = 2.0 / sh
