@@ -85,8 +85,6 @@ class CursorHider {
         
         // Force WindowServer to update the cursor visibility immediately
         if let loc = CGEvent(source: nil)?.location {
-            let event = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: loc, mouseButton: .left)
-            event?.post(tap: .cghidEventTap)
             CGWarpMouseCursorPosition(loc)
         }
     }
