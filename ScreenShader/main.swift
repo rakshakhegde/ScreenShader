@@ -209,9 +209,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
       CursorHider.shared.stopHiding()
     }
 
-    // Delay hiding the window so WindowServer has time to process the cursor restoration
-    // while our transparent overlay is still active and front-most.
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+    // Defer hiding the window to the next run loop cycle.
+    // This creates a separate WindowServer transaction, ensuring the cursor restores
+    // while the window is still active, without relying on magic number delays.
+    DispatchQueue.main.async { [weak self] in
       self?.screenManager.refreshConfig()
       self?.configWindowController?.refreshActiveEffects()
     }
