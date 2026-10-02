@@ -139,20 +139,25 @@ class MetalRenderer {
         return out;
       }
 
+      struct Uniforms {
+        float2 screenSize;
+        float2 mousePosition;
+        float time;
+        float padding;
+      };
+
       fragment float4 fragment_main(
         VertexOut in [[stage_in]],
         texture2d<float> inTexture [[texture(0)]],
-        constant float2 *screenSize [[buffer(0)]],
-        constant float2 *mousePosition [[buffer(1)]],
-        constant float *time [[buffer(2)]]
+        constant Uniforms &uniforms [[buffer(0)]]
       ) {
         ShaderInput shaderInput;
-        shaderInput.inputTexture = TextureWrapper{inTexture, *screenSize};
+        shaderInput.inputTexture = TextureWrapper{inTexture, uniforms.screenSize};
         shaderInput.texCoord = in.texCoord;
-        shaderInput.screenPosition = texToScreen(in.texCoord, *screenSize);
-        shaderInput.screenSize = *screenSize;
-        shaderInput.mousePosition = *mousePosition;
-        shaderInput.time = *time;
+        shaderInput.screenPosition = texToScreen(in.texCoord, uniforms.screenSize);
+        shaderInput.screenSize = uniforms.screenSize;
+        shaderInput.mousePosition = uniforms.mousePosition;
+        shaderInput.time = uniforms.time;
 
         return shaderFunction(shaderInput);
       }
@@ -294,6 +299,7 @@ class MetalRenderer {
     if intermediateTexture?.width != width || intermediateTexture?.height != height {
         let desc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: self.captureTexturePixelFormat, width: width, height: height, mipmapped: false)
         desc.usage = [.renderTarget, .shaderRead]
+        desc.storageMode = .private
         self.intermediateTexture = self.device.makeTexture(descriptor: desc)
     }
     
@@ -371,26 +377,31 @@ class MetalRenderer {
     
     let pass2Descriptor = MTLRenderPassDescriptor()
     pass2Descriptor.colorAttachments[0].texture = drawable.texture
-    pass2Descriptor.colorAttachments[0].loadAction = .clear
+    pass2Descriptor.colorAttachments[0].loadAction = .dontCare
     pass2Descriptor.colorAttachments[0].storeAction = .store
-    pass2Descriptor.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 0)
     
     if let encoder2 = commandBuffer.makeRenderCommandEncoder(descriptor: pass2Descriptor) {
         if let screen = window.screen {
             if let renderPipeline = self.renderPipeline {
-                var screenSize = vector_float2(Float(screen.frame.width), Float(screen.frame.height))
+                struct RenderUniforms {
+                    var screenSize: vector_float2
+                    var mousePosition: vector_float2
+                    var time: Float
+                    var padding: Float = 0
+                }
+                
+                let screenSize = vector_float2(Float(screen.frame.width), Float(screen.frame.height))
                 let globalMouse = NSEvent.mouseLocation
-                var mousePosition = vector_float2(
+                let mousePosition = vector_float2(
                   Float(globalMouse.x - screen.frame.origin.x), 
                   Float(globalMouse.y - screen.frame.origin.y))
-                var time = Float(ProcessInfo.processInfo.systemUptime)
+                let time = Float(ProcessInfo.processInfo.systemUptime)
+
+                var uniforms = RenderUniforms(screenSize: screenSize, mousePosition: mousePosition, time: time)
 
                 encoder2.setRenderPipelineState(renderPipeline)
                 encoder2.setFragmentTexture(intermediateTexture, index: 0)
-                encoder2.setFragmentBytes(&screenSize, length: MemoryLayout<vector_float2>.stride, index: 0)
-                encoder2.setFragmentBytes(
-                  &mousePosition, length: MemoryLayout<vector_float2>.stride, index: 1)
-                encoder2.setFragmentBytes(&time, length: MemoryLayout<Float>.stride, index: 2)
+                encoder2.setFragmentBytes(&uniforms, length: MemoryLayout<RenderUniforms>.stride, index: 0)
 
                 encoder2.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
             }
