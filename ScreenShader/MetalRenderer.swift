@@ -221,9 +221,10 @@ class MetalRenderer {
         return out;
       }
       
-      fragment float4 cursor_fragment_main(CursorVertexOut in [[stage_in]], texture2d<float> cursorTexture [[texture(0)]]) {
+      fragment float4 cursor_fragment_main(CursorVertexOut in [[stage_in]], texture2d<float> cursorTexture [[texture(0)]], constant float &opacity [[buffer(0)]]) {
         constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
-        return cursorTexture.sample(s, in.texCoord);
+        float4 color = cursorTexture.sample(s, in.texCoord);
+        return float4(color.rgb, color.a * opacity);
       }
     """
     let library = try device.makeLibrary(source: librarySource, options: nil)
@@ -359,6 +360,8 @@ class MetalRenderer {
                     encoder1.setFragmentTexture(cursorTex, index: 0)
                     encoder1.setVertexBytes(&quadVertices, length: MemoryLayout<vector_float2>.stride * 6, index: 0)
                     encoder1.setVertexBytes(&texCoords, length: MemoryLayout<vector_float2>.stride * 6, index: 1)
+                    var cursorOpacity = Float(cursorData.opacity)
+                    encoder1.setFragmentBytes(&cursorOpacity, length: MemoryLayout<Float>.stride, index: 0)
                     encoder1.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
                 }
             }

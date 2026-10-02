@@ -7,17 +7,20 @@ class CursorTracker {
     private let device: MTLDevice
     private let timer: DispatchSourceTimer
     private var lastHash: Int = 0
+    private var lastUpdateTime: CFTimeInterval = CACurrentMediaTime()
+    private let fadeDuration: CFTimeInterval = 0.1
     
     // Thread-safe state
     private let lock = NSLock()
     private var _activeTexture: MTLTexture?
     private var _activeHotSpot: CGPoint = .zero
     private var _activeSize: CGSize = .zero
+    private var _opacity: Float = 1.0
     
-    var currentData: (texture: MTLTexture?, hotSpot: CGPoint, size: CGSize) {
+    var currentData: (texture: MTLTexture?, hotSpot: CGPoint, size: CGSize, opacity: Float) {
         lock.lock()
         defer { lock.unlock() }
-        return (_activeTexture, _activeHotSpot, _activeSize)
+        return (_activeTexture, _activeHotSpot, _activeSize, _opacity)
     }
     
     init(device: MTLDevice) {
@@ -37,18 +40,37 @@ class CursorTracker {
     private func updateCursor() {
         let cursor = fetchCurrentCursor()
         
-        // Hide cursor if idle for 3 seconds
+        let currentTime = CACurrentMediaTime()
+        let dt = currentTime - lastUpdateTime
+        lastUpdateTime = currentTime
+        
         let idleTime = CGEventSource.secondsSinceLastEventType(.hidSystemState, eventType: .mouseMoved)
-        if idleTime > 5 {
-            lock.lock()
-            self._activeTexture = nil
-            lock.unlock()
-            lastHash = 0 // reset hash so it re-renders when it wakes up
+        let isIdle = idleTime > 5
+        
+        let opacityChange = Float(dt / fadeDuration)
+        
+        lock.lock()
+        if isIdle {
+            _opacity = max(0.0, _opacity - opacityChange)
+        } else {
+            _opacity = min(1.0, _opacity + opacityChange)
+        }
+        let currentOpacity = _opacity
+        let hasTexture = _activeTexture != nil
+        lock.unlock()
+        
+        if currentOpacity == 0.0 {
+            if hasTexture {
+                lock.lock()
+                self._activeTexture = nil
+                lock.unlock()
+                lastHash = 0
+            }
             return
         }
         
         let newHash = cursor.image.tiffRepresentation?.hashValue ?? 0
-        if newHash == lastHash {
+        if newHash == lastHash && hasTexture {
             return
         }
         
