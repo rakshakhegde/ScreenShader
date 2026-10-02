@@ -202,13 +202,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
   private func refreshConfig() {
     self.statusItem.button?.image = self.getMenuBarIcon()
 
-    self.screenManager.refreshConfig()
-    self.configWindowController?.refreshActiveEffects()
-    
+    // Manage cursor state BEFORE updating window visibility so WindowServer respects the change
     if self.config.effects.anyEffectActive() && self.config.useCustomCursor {
       CursorHider.shared.startHiding()
     } else {
       CursorHider.shared.stopHiding()
+    }
+
+    // Delay hiding the window so WindowServer has time to process the cursor restoration
+    // while our transparent overlay is still active and front-most.
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+      self?.screenManager.refreshConfig()
+      self?.configWindowController?.refreshActiveEffects()
     }
 
     // Indicate that the config should be saved to disk.
