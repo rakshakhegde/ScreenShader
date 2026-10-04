@@ -10,6 +10,7 @@ class OverlayController: NSObject, MTKViewDelegate {
   private var window: NSWindow!
   private var screenCapture: ScreenCapture!
   private var renderer: MetalRenderer!
+  private var displayLink: CVDisplayLink?
   private var contentBuffer: CVPixelBuffer?
   private var frameID: Int?
   private let dispatchQueue = DispatchQueue(label: "overlayController.queue")
@@ -47,15 +48,26 @@ class OverlayController: NSObject, MTKViewDelegate {
     let metalView = MetalView(frame: contentRect)
     metalView.delegate = self
     metalView.wantsLayer = true
-    metalView.isPaused = false
+    metalView.isPaused = true // Pause internal timer
     metalView.enableSetNeedsDisplay = false
-    
-    // Unlock >60fps for ProMotion displays based on config.targetFPS
-    metalView.preferredFramesPerSecond = self.config.targetFPS
     self.window.contentView = metalView
     self.window.makeKeyAndOrderFront(nil)
 
     self.renderer = self.makeRenderer(metalLayer: metalView.metalLayer)
+
+    // Bypass macOS MTKView throttling using a raw CVDisplayLink bound to the display
+    CVDisplayLinkCreateWithCGDisplay(self.targetDisplayID, &self.displayLink)
+    if let displayLink = self.displayLink {
+        let userInfo = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
+        CVDisplayLinkSetOutputCallback(displayLink, { (_, _, _, _, _, userInfo) -> CVReturn in
+            if let userInfo = userInfo {
+                let controller = Unmanaged<OverlayController>.fromOpaque(userInfo).takeUnretainedValue()
+                controller.render()
+            }
+            return kCVReturnSuccess
+        }, userInfo)
+        CVDisplayLinkStart(displayLink)
+    }
 
     self.screenCapture = ScreenCapture()
     self.screenCapture.config = self.config

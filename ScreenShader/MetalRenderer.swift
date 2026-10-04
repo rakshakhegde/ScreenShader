@@ -60,6 +60,7 @@ class MetalRenderer {
     metalLayer.contentsScale = NSScreen.main?.backingScaleFactor ?? 1.0
     metalLayer.isOpaque = true
     metalLayer.backgroundColor = NSColor.black.cgColor
+    metalLayer.displaySyncEnabled = false
 
     var cache: CVMetalTextureCache?
     CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, self.device, nil, &cache)
