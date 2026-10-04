@@ -36,8 +36,8 @@ class OverlayController: NSObject, MTKViewDelegate {
     let panel = self.window as! NSPanel
     panel.isFloatingPanel = true
     
-    self.window.isOpaque = false
-    self.window.backgroundColor = .clear
+    self.window.isOpaque = true
+    self.window.backgroundColor = .black
     self.window.hasShadow = false
     self.window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.maximumWindow)))
     self.window.ignoresMouseEvents = true

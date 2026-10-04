@@ -58,8 +58,8 @@ class MetalRenderer {
     metalLayer.wantsExtendedDynamicRangeContent = wantsEDR
     metalLayer.framebufferOnly = true
     metalLayer.contentsScale = NSScreen.main?.backingScaleFactor ?? 1.0
-    metalLayer.isOpaque = false
-    metalLayer.backgroundColor = NSColor.clear.cgColor
+    metalLayer.isOpaque = true
+    metalLayer.backgroundColor = NSColor.black.cgColor
 
     var cache: CVMetalTextureCache?
     CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, self.device, nil, &cache)
