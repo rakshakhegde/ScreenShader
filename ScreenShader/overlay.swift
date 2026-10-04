@@ -145,19 +145,25 @@ class OverlayController: NSObject, MTKViewDelegate {
   }
 
   func render() {
-    var contentBuffer: CVPixelBuffer?
-    var frameID: Int?
+    var contentBufferToRender: CVPixelBuffer?
+    var frameIDToRender: Int?
 
     self.dispatchQueue.sync {
-        contentBuffer = self.contentBuffer
-        frameID = self.frameID
-        self.frameID = nil
-        self.contentBuffer = nil
+        contentBufferToRender = self.contentBuffer
+        frameIDToRender = self.frameID
     }
     
-    if let contentBuffer = contentBuffer, let frameID = frameID {
+    if let contentBuffer = contentBufferToRender {
       self.renderer.renderContentBuffer(window: self.window, contentBuffer: contentBuffer)
-      self.metrics.recordRender(frameID: frameID)
+      if let frameID = frameIDToRender {
+          self.metrics.recordRender(frameID: frameID)
+          // Clear frameID so we don't record the same frame multiple times for metrics
+          self.dispatchQueue.sync {
+              if self.frameID == frameID {
+                  self.frameID = nil
+              }
+          }
+      }
     }
   }
 
