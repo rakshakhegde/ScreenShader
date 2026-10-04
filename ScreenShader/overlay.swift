@@ -167,18 +167,14 @@ class OverlayController: NSObject, MTKViewDelegate {
     self.dispatchQueue.sync {
         contentBufferToRender = self.contentBuffer
         frameIDToRender = self.frameID
+        // Clear frameID immediately so concurrent CVDisplayLink threads don't double-render
+        self.frameID = nil
     }
     
     if let contentBuffer = contentBufferToRender {
       self.renderer.renderContentBuffer(window: self.window, contentBuffer: contentBuffer)
       if let frameID = frameIDToRender {
           self.metrics.recordRender(frameID: frameID)
-          // Clear frameID so we don't record the same frame multiple times for metrics
-          self.dispatchQueue.sync {
-              if self.frameID == frameID {
-                  self.frameID = nil
-              }
-          }
       }
     }
   }
