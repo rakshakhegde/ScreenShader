@@ -48,6 +48,9 @@ class OverlayController: NSObject, MTKViewDelegate {
     metalView.wantsLayer = true
     metalView.isPaused = false
     metalView.enableSetNeedsDisplay = false
+    
+    // Unlock >60fps for ProMotion displays based on config.targetFPS
+    metalView.preferredFramesPerSecond = self.config.targetFPS
     self.window.contentView = metalView
     self.window.makeKeyAndOrderFront(nil)
 

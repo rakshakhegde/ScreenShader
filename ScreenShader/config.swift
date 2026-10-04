@@ -181,7 +181,7 @@ let predefinedShaders: [(String, String)] = [
 class Config: Codable {
   var configVersion: Int = 1
   var effects: Effects = Effects()
-  var targetFPS: Int = 60
+  var targetFPS: Int = 120
   
   var _useCustomCursor: Bool?
   var useCustomCursor: Bool {
