@@ -5,8 +5,12 @@ class Metrics {
   private var screenCaptureTimestamps: [Int: Double] = [:]
   private var numRenders: Int = 0
   private var totalLatency: Double = 0
-  private var prevUpdateTimestamp: Double = 0
+  private var prevUpdateTimestamp: Double
   private let dispatchQueue = DispatchQueue(label: "metrics.dispatchQueue")
+
+  init() {
+    self.prevUpdateTimestamp = CACurrentMediaTime()
+  }
 
   var screenCaptureFPS: Double = 0
   var renderFPS: Double = 0
@@ -21,15 +25,14 @@ class Metrics {
     return frameID
   }
 
-  func recordScreenCapture(frameID: Int) {
-    let timestamp = ProcessInfo.processInfo.systemUptime
+  func recordScreenCapture(frameID: Int, captureTime: Double) {
     self.dispatchQueue.async {
-      self.screenCaptureTimestamps[frameID] = timestamp
+      self.screenCaptureTimestamps[frameID] = captureTime
     }
   }
 
   func recordRender(frameID: Int) {
-    let timestamp = ProcessInfo.processInfo.systemUptime
+    let timestamp = CACurrentMediaTime()
     self.dispatchQueue.async {
       if let screenCaptureTimestamp = self.screenCaptureTimestamps[frameID] {
         let latency = timestamp - screenCaptureTimestamp
@@ -41,7 +44,7 @@ class Metrics {
 
   func updateStats() {
     self.dispatchQueue.async {
-      let now = ProcessInfo.processInfo.systemUptime
+      let now = CACurrentMediaTime()
       let delta = now - self.prevUpdateTimestamp
       self.prevUpdateTimestamp = now
       

@@ -8,7 +8,7 @@ class ScreenCapture: NSObject, SCStreamDelegate {
   var targetScaleFactor: CGFloat = 1.0
   var targetColorSpaceName: CFString? = nil
   var excludedWindowIDs: [CGWindowID] = []
-  var onFrameReceived: (CVPixelBuffer) -> Void = { _ in }
+  var onFrameReceived: (CVPixelBuffer, Double) -> Void = { _, _ in }
   private var capturing: Bool = false
   private var stream: SCStream?
   private var streamOutput: StreamOutput?
@@ -125,9 +125,9 @@ class ScreenCapture: NSObject, SCStreamDelegate {
 }
 
 private class StreamOutput: NSObject, SCStreamOutput {
-  private let onFrameReceived: (CVPixelBuffer) -> Void
+  private let onFrameReceived: (CVPixelBuffer, Double) -> Void
 
-  init(onFrameReceived: @escaping (CVPixelBuffer) -> Void) {
+  init(onFrameReceived: @escaping (CVPixelBuffer, Double) -> Void) {
     self.onFrameReceived = onFrameReceived
   }
 
@@ -137,7 +137,8 @@ private class StreamOutput: NSObject, SCStreamOutput {
   ) {
     guard outputType == .screen else { return }
     if let buffer = sampleBuffer.imageBuffer {
-      self.onFrameReceived(buffer)
+      let captureTime = CMTimeGetSeconds(CMSampleBufferGetPresentationTimeStamp(sampleBuffer))
+      self.onFrameReceived(buffer, captureTime)
     }
   }
 }

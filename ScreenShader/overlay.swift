@@ -75,8 +75,8 @@ class OverlayController: NSObject, MTKViewDelegate {
     self.screenCapture.targetScaleFactor = self.targetScreen.backingScaleFactor
     self.screenCapture.targetColorSpaceName = self.targetScreen.colorSpace?.cgColorSpace?.name
     self.screenCapture.excludedWindowIDs = [CGWindowID(self.window.windowNumber)]
-    self.screenCapture.onFrameReceived = { [weak self] contentBuffer in
-      self?.receiveFrame(contentBuffer: contentBuffer)
+    self.screenCapture.onFrameReceived = { [weak self] contentBuffer, captureTime in
+      self?.receiveFrame(contentBuffer: contentBuffer, captureTime: captureTime)
     }
   }
 
@@ -142,9 +142,9 @@ class OverlayController: NSObject, MTKViewDelegate {
       self.window.orderFrontRegardless()
   }
 
-  func receiveFrame(contentBuffer: CVPixelBuffer) {
+  func receiveFrame(contentBuffer: CVPixelBuffer, captureTime: Double) {
     let frameID = self.metrics.newFrameID()
-    self.metrics.recordScreenCapture(frameID: frameID)
+    self.metrics.recordScreenCapture(frameID: frameID, captureTime: captureTime)
 
     self.dispatchQueue.async {
       self.frameID = frameID
