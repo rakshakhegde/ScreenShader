@@ -37,7 +37,8 @@ class MetalRenderer {
     drawablePixelFormat: MTLPixelFormat,
     colorspace: CGColorSpace,
     wantsEDR: Bool,
-    captureTexturePixelFormat: MTLPixelFormat
+    captureTexturePixelFormat: MTLPixelFormat,
+    backingScaleFactor: CGFloat
   ) {
     guard let device = MTLCreateSystemDefaultDevice() else {
       fatalError("Unable to access a Metal device on this system.")
@@ -57,7 +58,7 @@ class MetalRenderer {
     metalLayer.colorspace = colorspace
     metalLayer.wantsExtendedDynamicRangeContent = wantsEDR
     metalLayer.framebufferOnly = true
-    metalLayer.contentsScale = NSScreen.main?.backingScaleFactor ?? 1.0
+    metalLayer.contentsScale = backingScaleFactor
     metalLayer.isOpaque = true
     metalLayer.backgroundColor = NSColor.black.cgColor
     metalLayer.displaySyncEnabled = false
@@ -414,8 +415,8 @@ class MetalRenderer {
     commandBuffer.commit()
   }
 
-  func updateScaleFactor(metalLayer: CAMetalLayer) {
-    metalLayer.contentsScale = NSScreen.main?.backingScaleFactor ?? 1.0
+  func updateScaleFactor(metalLayer: CAMetalLayer, backingScaleFactor: CGFloat) {
+    metalLayer.contentsScale = backingScaleFactor
   }
 
   func flushTextureCache() {

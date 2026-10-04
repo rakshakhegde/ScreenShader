@@ -116,7 +116,8 @@ class OverlayController: NSObject, MTKViewDelegate {
       drawablePixelFormat: drawablePixelFormat,
       colorspace: screenColorSpace,
       wantsEDR: wantsEDR,
-      captureTexturePixelFormat: captureTexturePixelFormat
+      captureTexturePixelFormat: captureTexturePixelFormat,
+      backingScaleFactor: self.targetScreen.backingScaleFactor
     )
   }
   
