@@ -40,6 +40,7 @@ class OverlayController: NSObject, MTKViewDelegate {
     self.window.backgroundColor = .black
     self.window.hasShadow = false
     self.window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.maximumWindow)))
+//    self.window.level = .normal
     self.window.ignoresMouseEvents = true
     self.window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary, .transient]
 
@@ -125,7 +126,6 @@ class OverlayController: NSObject, MTKViewDelegate {
 
   func restartCapture() {
       self.screenCapture.restartCapture()
-      self.window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.maximumWindow)))
       self.window.orderFrontRegardless()
   }
 
