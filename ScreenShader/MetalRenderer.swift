@@ -326,7 +326,9 @@ class MetalRenderer {
             if let cursorPipeline = self.cursorPipeline, let tracker = self.cursorTracker {
                 let cursorData = tracker.currentData
                 if let cursorTex = cursorData.texture {
-                    let globalMouse = NSEvent.mouseLocation
+                    let cgLoc = CGEvent(source: CGEventSource(stateID: .hidSystemState))?.location ?? .zero
+                    let mainScreenHeight = CGDisplayBounds(CGMainDisplayID()).height
+                    let globalMouse = NSPoint(x: cgLoc.x, y: CGFloat(mainScreenHeight) - cgLoc.y)
                     let mx = Float(globalMouse.x - screen.frame.origin.x)
                     let my = Float(globalMouse.y - screen.frame.origin.y)
                     let sw = Float(screen.frame.width)
@@ -393,7 +395,9 @@ class MetalRenderer {
                 }
                 
                 let screenSize = vector_float2(Float(screen.frame.width), Float(screen.frame.height))
-                let globalMouse = NSEvent.mouseLocation
+                let cgLoc2 = CGEvent(source: CGEventSource(stateID: .hidSystemState))?.location ?? .zero
+                let mainScreenHeight2 = CGDisplayBounds(CGMainDisplayID()).height
+                let globalMouse = NSPoint(x: cgLoc2.x, y: CGFloat(mainScreenHeight2) - cgLoc2.y)
                 let mousePosition = vector_float2(
                   Float(globalMouse.x - screen.frame.origin.x), 
                   Float(globalMouse.y - screen.frame.origin.y))
