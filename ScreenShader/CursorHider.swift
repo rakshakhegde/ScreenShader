@@ -1,6 +1,5 @@
 import AppKit
 import CoreGraphics
-import QuartzCore
 
 @_silgen_name("CGSMainConnectionID")
 func CGSMainConnectionID() -> Int32
@@ -16,7 +15,6 @@ class CursorHider {
     
     private var transparentCursor: NSCursor?
     private var enforceTimer: Timer?
-    private var hideCount = 0
     private let kCGSDisableCursor: Int32 = 0x08000000
     private var isHiding = false
     
@@ -38,7 +36,6 @@ class CursorHider {
         transparentCursor?.push()
         
         CGDisplayHideCursor(CGMainDisplayID())
-        hideCount += 1
         _ = CGSSetDebugOptions(kCGSDisableCursor)
         
         enforceTimer = Timer.scheduledTimer(timeInterval: 0.05, target: self, selector: #selector(aggressivelyHide), userInfo: nil, repeats: true)
@@ -50,7 +47,6 @@ class CursorHider {
     @objc private func aggressivelyHide() {
         _ = CGSSetDebugOptions(kCGSDisableCursor)
         CGDisplayHideCursor(CGMainDisplayID())
-        hideCount += 1
     }
     
     func stopHiding() {
@@ -73,11 +69,6 @@ class CursorHider {
         NSCursor.pop()
         
         _ = CGSSetDebugOptions(0)
-        
-        for _ in 0..<hideCount {
-            CGDisplayShowCursor(CGMainDisplayID())
-        }
-        hideCount = 0
         
         // Hard-reset the cursor connection
         CGAssociateMouseAndMouseCursorPosition(0)
