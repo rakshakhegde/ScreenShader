@@ -132,14 +132,24 @@ class OverlayController: NSObject, MTKViewDelegate {
   }
 
   func stopAndTearDown() {
+      if let displayLink = self.displayLink {
+          CVDisplayLinkStop(displayLink)
+          self.displayLink = nil
+      }
       self.screenCapture.stopCapture()
-      self.window.orderOut(nil)
+      self.window?.orderOut(nil)
       self.window = nil
+  }
+
+  deinit {
+      if let displayLink = self.displayLink {
+          CVDisplayLinkStop(displayLink)
+      }
   }
 
   func restartCapture() {
       self.screenCapture.restartCapture()
-      self.window.orderFrontRegardless()
+      self.window?.orderFrontRegardless()
   }
 
   func receiveFrame(contentBuffer: CVPixelBuffer, captureTime: Double) {
@@ -171,8 +181,8 @@ class OverlayController: NSObject, MTKViewDelegate {
         self.frameID = nil
     }
     
-    if let contentBuffer = contentBufferToRender {
-      self.renderer.renderContentBuffer(window: self.window, contentBuffer: contentBuffer)
+    if let contentBuffer = contentBufferToRender, let window = self.window {
+      self.renderer.renderContentBuffer(window: window, contentBuffer: contentBuffer)
       if let frameID = frameIDToRender {
           self.metrics.recordRender(frameID: frameID)
       }
