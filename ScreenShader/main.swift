@@ -12,6 +12,7 @@ class ScreenManager: NSObject {
   private var screenSignatures: [CGDirectDisplayID: String] = [:]
   
   private var pendingScreenChange: DispatchWorkItem?
+  private var isSleeping: Bool = false
 
   init(config: Config, metrics: Metrics, errorMessage: ErrorMessage) {
     self.config = config
@@ -69,6 +70,10 @@ class ScreenManager: NSObject {
   }
 
   @objc private func handleScreenChange() {
+    guard !isSleeping else {
+      Logger.shared.log("ScreenManager: Ignoring screen change while sleeping.")
+      return
+    }
     pendingScreenChange?.cancel()
     let workItem = DispatchWorkItem { [weak self] in
       self?.evaluateScreens(forceRestart: false)
@@ -79,6 +84,7 @@ class ScreenManager: NSObject {
   
   @objc private func handleWake() {
     Logger.shared.log("ScreenManager: Wake detected. Debouncing and evaluating screens.")
+    isSleeping = false
     pendingScreenChange?.cancel()
     let workItem = DispatchWorkItem { [weak self] in
       self?.evaluateScreens(forceRestart: true)
@@ -89,6 +95,7 @@ class ScreenManager: NSObject {
 
   @objc private func handleSleep() {
     Logger.shared.log("ScreenManager: Sleep detected. Pausing capture and display links.")
+    isSleeping = true
     pendingScreenChange?.cancel()
     for (_, controller) in overlayControllers {
       controller.pause()
@@ -96,6 +103,10 @@ class ScreenManager: NSObject {
   }
 
   @objc private func handleSpaceChange() {
+    guard !isSleeping else {
+      Logger.shared.log("ScreenManager: Ignoring space change while sleeping.")
+      return
+    }
     Logger.shared.log("ScreenManager: Active space changed. Restarting capture.")
     pendingScreenChange?.cancel()
     let workItem = DispatchWorkItem { [weak self] in
