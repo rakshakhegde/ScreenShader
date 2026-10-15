@@ -13,19 +13,19 @@ func CGSSetDebugOptions(_ options: Int32) -> CGError
 class CursorHider {
     static let shared = CursorHider()
     
-    private var transparentCursor: NSCursor?
-    private var enforceTimer: Timer?
-    private let kCGSDisableCursor: Int32 = 0x08000000
-    private var isHiding = false
-    
-    init() {
+    private lazy var transparentCursor: NSCursor = {
         let transparentImage = NSImage(size: NSSize(width: 1, height: 1))
         transparentImage.lockFocus()
         NSColor.clear.set()
         NSRect(x: 0, y: 0, width: 1, height: 1).fill()
         transparentImage.unlockFocus()
-        transparentCursor = NSCursor(image: transparentImage, hotSpot: .zero)
-    }
+        return NSCursor(image: transparentImage, hotSpot: .zero)
+    }()
+    private var enforceTimer: Timer?
+    private let kCGSDisableCursor: Int32 = 0x08000000
+    private var isHiding = false
+    
+    private init() {}
     
     func startHiding() {
         guard !isHiding else { return }
@@ -33,7 +33,7 @@ class CursorHider {
         
         let cid = CGSMainConnectionID()
         _ = CGSSetConnectionProperty(cid, cid, "SetsCursorInBackground" as CFString, kCFBooleanTrue)
-        transparentCursor?.push()
+        transparentCursor.push()
         
         CGDisplayHideCursor(CGMainDisplayID())
         _ = CGSSetDebugOptions(kCGSDisableCursor)
