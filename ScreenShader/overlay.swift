@@ -147,7 +147,17 @@ class OverlayController: NSObject, MTKViewDelegate {
       }
   }
 
+  func pause() {
+      if let displayLink = self.displayLink, CVDisplayLinkIsRunning(displayLink) {
+          CVDisplayLinkStop(displayLink)
+      }
+      self.screenCapture.stopCapture()
+  }
+
   func restartCapture() {
+      if let displayLink = self.displayLink, !CVDisplayLinkIsRunning(displayLink) {
+          CVDisplayLinkStart(displayLink)
+      }
       self.screenCapture.restartCapture()
       self.window?.orderFrontRegardless()
   }

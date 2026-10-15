@@ -39,6 +39,20 @@ class ScreenManager: NSObject {
       name: NSWorkspace.screensDidWakeNotification,
       object: nil
     )
+
+    NSWorkspace.shared.notificationCenter.addObserver(
+      self,
+      selector: #selector(handleSleep),
+      name: NSWorkspace.willSleepNotification,
+      object: nil
+    )
+
+    NSWorkspace.shared.notificationCenter.addObserver(
+      self,
+      selector: #selector(handleSleep),
+      name: NSWorkspace.screensDidSleepNotification,
+      object: nil
+    )
     
     NSWorkspace.shared.notificationCenter.addObserver(
       self,
@@ -71,6 +85,14 @@ class ScreenManager: NSObject {
     }
     pendingScreenChange = workItem
     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: workItem)
+  }
+
+  @objc private func handleSleep() {
+    Logger.shared.log("ScreenManager: Sleep detected. Pausing capture and display links.")
+    pendingScreenChange?.cancel()
+    for (_, controller) in overlayControllers {
+      controller.pause()
+    }
   }
 
   @objc private func handleSpaceChange() {
