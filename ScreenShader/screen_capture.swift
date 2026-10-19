@@ -51,6 +51,7 @@ class ScreenCapture: NSObject, SCStreamDelegate {
         let excludedWindows = content.windows.filter { window in
           self.excludedWindowIDs.contains(window.windowID)
         }
+        Logger.shared.log("startCapture: Excluded windows count: \(excludedWindows.count), target IDs: \(self.excludedWindowIDs)")
         let filter = SCContentFilter(display: display, excludingWindows: excludedWindows)
 
         let scaleFactor = self.targetScaleFactor
@@ -62,6 +63,7 @@ class ScreenCapture: NSObject, SCStreamDelegate {
         streamConfig.minimumFrameInterval = CMTime(
           value: 1, timescale: CMTimeScale(self.config.targetFPS))
         streamConfig.pixelFormat = kCVPixelFormatType_32BGRA
+        streamConfig.queueDepth = 5
 
         if let csName = self.targetColorSpaceName {
           streamConfig.colorSpaceName = csName

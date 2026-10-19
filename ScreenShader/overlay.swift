@@ -44,7 +44,7 @@ class OverlayController: NSObject, MTKViewDelegate {
     self.window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.maximumWindow)))
 //    self.window.level = .normal
     self.window.ignoresMouseEvents = true
-    self.window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary, .transient]
+    self.window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
 
     let metalView = MetalView(frame: contentRect)
     metalView.delegate = self
@@ -195,6 +195,10 @@ class OverlayController: NSObject, MTKViewDelegate {
 
     guard let contentBuffer = contentBufferToRender,
           let renderer = self.renderer else {
+      return
+    }
+
+    if frameIDToRender == nil && renderer.cursorTracker == nil {
       return
     }
 
