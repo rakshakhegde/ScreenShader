@@ -14,6 +14,8 @@ class OverlayController: NSObject, MTKViewDelegate {
   private var contentBuffer: CVPixelBuffer?
   private var frameID: Int?
   private var lastRenderedMouseLocation: NSPoint?
+  private var lastRenderTime: Double = CACurrentMediaTime()
+  private var renderFrameCount: Int = 0
   private let dispatchQueue = DispatchQueue(label: "overlayController.queue")
 
   private var targetScreen: NSScreen
@@ -219,6 +221,13 @@ class OverlayController: NSObject, MTKViewDelegate {
 
     renderer.renderContentBuffer(contentBuffer: contentBuffer)
     if let frameID = frameIDToRender {
+        let now = CACurrentMediaTime()
+        let dt = now - self.lastRenderTime
+        self.lastRenderTime = now
+        self.renderFrameCount += 1
+        if dt > 0.05 && self.renderFrameCount > 5 {
+          Logger.shared.log("OverlayController[display \(self.targetDisplayID)] render GAP: \(Int(dt * 1000))ms! renderCount=\(self.renderFrameCount)")
+        }
         self.metrics.recordRender(frameID: frameID)
     }
   }

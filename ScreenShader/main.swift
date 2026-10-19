@@ -54,6 +54,14 @@ class ScreenManager: NSObject {
       name: NSWorkspace.screensDidSleepNotification,
       object: nil
     )
+
+    NSWorkspace.shared.notificationCenter.addObserver(
+      forName: NSWorkspace.activeSpaceDidChangeNotification,
+      object: nil,
+      queue: .main
+    ) { _ in
+      Logger.shared.log(">>> NOTIFICATION: NSWorkspace.activeSpaceDidChangeNotification <<<")
+    }
     
     self.evaluateScreens(forceRestart: false)
   }

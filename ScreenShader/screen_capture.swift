@@ -79,7 +79,7 @@ class ScreenCapture: NSObject, SCStreamDelegate {
         streamConfig.showsCursor = false
 
         self.stream = SCStream(filter: filter, configuration: streamConfig, delegate: self)
-        self.streamOutput = StreamOutput(onFrameReceived: self.onFrameReceived)
+        self.streamOutput = StreamOutput(displayID: self.targetDisplayID, onFrameReceived: self.onFrameReceived)
 
         try self.stream!.addStreamOutput(
           self.streamOutput!, type: .screen, sampleHandlerQueue: self.streamQueue)
@@ -128,9 +128,13 @@ class ScreenCapture: NSObject, SCStreamDelegate {
 }
 
 private class StreamOutput: NSObject, SCStreamOutput {
+  private let displayID: CGDirectDisplayID
   private let onFrameReceived: (CVPixelBuffer, Double) -> Void
+  private var lastFrameTime: Double = CACurrentMediaTime()
+  private var frameCount: Int = 0
 
-  init(onFrameReceived: @escaping (CVPixelBuffer, Double) -> Void) {
+  init(displayID: CGDirectDisplayID, onFrameReceived: @escaping (CVPixelBuffer, Double) -> Void) {
+    self.displayID = displayID
     self.onFrameReceived = onFrameReceived
   }
 
@@ -139,6 +143,18 @@ private class StreamOutput: NSObject, SCStreamOutput {
     of outputType: SCStreamOutputType
   ) {
     guard outputType == .screen else { return }
+
+    let now = CACurrentMediaTime()
+    let dt = now - lastFrameTime
+    lastFrameTime = now
+    frameCount += 1
+
+    let attachments = (CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]])?.first
+    let statusRaw = attachments?[.status] as? Int ?? -1
+    let status = SCFrameStatus(rawValue: statusRaw)
+
+    Logger.shared.log("StreamOutput[display \(displayID)] FRAME #\(frameCount): dt=\(Int(dt * 1000))ms, status=\(String(describing: status))")
+
     if let buffer = sampleBuffer.imageBuffer {
       let captureTime = CMTimeGetSeconds(CMSampleBufferGetPresentationTimeStamp(sampleBuffer))
       self.onFrameReceived(buffer, captureTime)
