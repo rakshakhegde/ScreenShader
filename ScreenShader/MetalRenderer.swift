@@ -66,7 +66,10 @@ class MetalRenderer {
     metalLayer.contentsScale = backingScaleFactor
     metalLayer.isOpaque = true
     metalLayer.backgroundColor = NSColor.black.cgColor
-    metalLayer.displaySyncEnabled = true
+    // Disable displaySyncEnabled: CVDisplayLink already paces our frame timing.
+    // Keeping displaySyncEnabled=true causes WindowServer to freeze drawable presentation
+    // for 1000ms during Mission Control transitions on external displays.
+    metalLayer.displaySyncEnabled = false
 
     var cache: CVMetalTextureCache?
     CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, self.device, nil, &cache)

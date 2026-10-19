@@ -186,49 +186,51 @@ class OverlayController: NSObject, MTKViewDelegate {
   }
 
   func render() {
-    var contentBufferToRender: CVPixelBuffer?
-    var frameIDToRender: Int?
+    autoreleasepool {
+      var contentBufferToRender: CVPixelBuffer?
+      var frameIDToRender: Int?
 
-    self.dispatchQueue.sync {
-        contentBufferToRender = self.contentBuffer
-        frameIDToRender = self.frameID
-        // Clear frameID immediately so concurrent CVDisplayLink threads don't double-render
-        self.frameID = nil
-    }
+      self.dispatchQueue.sync {
+          contentBufferToRender = self.contentBuffer
+          frameIDToRender = self.frameID
+          // Clear frameID immediately so concurrent CVDisplayLink threads don't double-render
+          self.frameID = nil
+      }
 
-    guard let contentBuffer = contentBufferToRender,
-          let renderer = self.renderer else {
-      return
-    }
-
-    if frameIDToRender == nil {
-      guard renderer.cursorTracker != nil else {
+      guard let contentBuffer = contentBufferToRender,
+            let renderer = self.renderer else {
         return
       }
+
+      if frameIDToRender == nil {
+        guard renderer.cursorTracker != nil else {
+          return
+        }
+        let cgLoc = CGEvent(source: CGEventSource(stateID: .hidSystemState))?.location ?? .zero
+        let mainScreenHeight = CGDisplayBounds(CGMainDisplayID()).height
+        let globalMouse = NSPoint(x: cgLoc.x, y: CGFloat(mainScreenHeight) - cgLoc.y)
+
+        // Skip render if the mouse is outside this display, or if mouse hasn't moved since last render
+        if !self.targetScreen.frame.contains(globalMouse) || globalMouse == self.lastRenderedMouseLocation {
+          return
+        }
+      }
+
       let cgLoc = CGEvent(source: CGEventSource(stateID: .hidSystemState))?.location ?? .zero
       let mainScreenHeight = CGDisplayBounds(CGMainDisplayID()).height
-      let globalMouse = NSPoint(x: cgLoc.x, y: CGFloat(mainScreenHeight) - cgLoc.y)
+      self.lastRenderedMouseLocation = NSPoint(x: cgLoc.x, y: CGFloat(mainScreenHeight) - cgLoc.y)
 
-      // Skip render if the mouse is outside this display, or if mouse hasn't moved since last render
-      if !self.targetScreen.frame.contains(globalMouse) || globalMouse == self.lastRenderedMouseLocation {
-        return
+      renderer.renderContentBuffer(contentBuffer: contentBuffer)
+      if let frameID = frameIDToRender {
+          let now = CACurrentMediaTime()
+          let dt = now - self.lastRenderTime
+          self.lastRenderTime = now
+          self.renderFrameCount += 1
+          if dt > 0.05 && self.renderFrameCount > 5 {
+            Logger.shared.log("OverlayController[display \(self.targetDisplayID)] render GAP: \(Int(dt * 1000))ms! renderCount=\(self.renderFrameCount)")
+          }
+          self.metrics.recordRender(frameID: frameID)
       }
-    }
-
-    let cgLoc = CGEvent(source: CGEventSource(stateID: .hidSystemState))?.location ?? .zero
-    let mainScreenHeight = CGDisplayBounds(CGMainDisplayID()).height
-    self.lastRenderedMouseLocation = NSPoint(x: cgLoc.x, y: CGFloat(mainScreenHeight) - cgLoc.y)
-
-    renderer.renderContentBuffer(contentBuffer: contentBuffer)
-    if let frameID = frameIDToRender {
-        let now = CACurrentMediaTime()
-        let dt = now - self.lastRenderTime
-        self.lastRenderTime = now
-        self.renderFrameCount += 1
-        if dt > 0.05 && self.renderFrameCount > 5 {
-          Logger.shared.log("OverlayController[display \(self.targetDisplayID)] render GAP: \(Int(dt * 1000))ms! renderCount=\(self.renderFrameCount)")
-        }
-        self.metrics.recordRender(frameID: frameID)
     }
   }
 
