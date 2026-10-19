@@ -190,12 +190,16 @@ class OverlayController: NSObject, MTKViewDelegate {
         // Clear frameID immediately so concurrent CVDisplayLink threads don't double-render
         self.frameID = nil
     }
-    
-    if let contentBuffer = contentBufferToRender, let window = self.window {
-      self.renderer.renderContentBuffer(window: window, contentBuffer: contentBuffer)
-      if let frameID = frameIDToRender {
-          self.metrics.recordRender(frameID: frameID)
-      }
+
+    guard let contentBuffer = contentBufferToRender,
+          let window = self.window,
+          let renderer = self.renderer else {
+      return
+    }
+
+    renderer.renderContentBuffer(window: window, contentBuffer: contentBuffer)
+    if let frameID = frameIDToRender {
+        self.metrics.recordRender(frameID: frameID)
     }
   }
 

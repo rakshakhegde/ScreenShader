@@ -125,8 +125,24 @@ class ScreenManager: NSObject {
       guard let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else {
         continue
       }
-      
       currentDisplayIDs.insert(displayID)
+    }
+
+    // Clean up disconnected screens FIRST so their CVDisplayLinks stop
+    // before we block the main thread creating new controllers.
+    let disconnectedIDs = Set(overlayControllers.keys).subtracting(currentDisplayIDs)
+    for id in disconnectedIDs {
+      Logger.shared.log("ScreenManager: Screen \(id) disconnected. Tearing down.")
+      overlayControllers[id]?.stopAndTearDown()
+      overlayControllers.removeValue(forKey: id)
+      screenSignatures.removeValue(forKey: id)
+    }
+
+    for screen in NSScreen.screens {
+      guard let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else {
+        continue
+      }
+      
       let newSignature = getScreenSignature(displayID: displayID, screen: screen)
       let oldSignature = screenSignatures[displayID]
       
@@ -151,15 +167,6 @@ class ScreenManager: NSObject {
         Logger.shared.log("ScreenManager: Screen \(displayID) unchanged, but forceRestart requested.")
         overlayControllers[displayID]?.restartCapture()
       }
-    }
-    
-    // Clean up disconnected screens
-    let disconnectedIDs = Set(overlayControllers.keys).subtracting(currentDisplayIDs)
-    for id in disconnectedIDs {
-      Logger.shared.log("ScreenManager: Screen \(id) disconnected. Tearing down.")
-      overlayControllers[id]?.stopAndTearDown()
-      overlayControllers.removeValue(forKey: id)
-      screenSignatures.removeValue(forKey: id)
     }
     
     // Always refresh config after evaluating to ensure shaders are active and captures start
