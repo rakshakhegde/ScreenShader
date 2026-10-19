@@ -36,6 +36,7 @@ class OverlayController: NSObject, MTKViewDelegate {
     )
     let panel = self.window as! NSPanel
     panel.isFloatingPanel = true
+    panel.hidesOnDeactivate = false
     
     self.window.isOpaque = true
     self.window.backgroundColor = .black
