@@ -263,6 +263,9 @@ class MetalRenderer {
       self.renderPipeline = nil
       return
     }
+    if effectSource == self.activeEffectSource && self.renderPipeline != nil {
+      return
+    }
     self.activeEffectSource = effectSource
     do {
       self.renderPipeline = try Self.buildRenderPipeline(

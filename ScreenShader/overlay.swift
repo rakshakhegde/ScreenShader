@@ -178,7 +178,7 @@ class OverlayController: NSObject, MTKViewDelegate {
   func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
 
   func draw(in view: MTKView) {
-    self.render()
+    // Rendering is driven exclusively by CVDisplayLink on a background thread.
   }
 
   func render() {
@@ -229,8 +229,12 @@ class OverlayController: NSObject, MTKViewDelegate {
     self.window.setIsVisible(active)
     self.screenCapture.setCapturing(active)
 
-    if let metalView = self.window.contentView as? MetalView {
-      metalView.isPaused = !active
+    if let displayLink = self.displayLink {
+      if active && !CVDisplayLinkIsRunning(displayLink) {
+        CVDisplayLinkStart(displayLink)
+      } else if !active && CVDisplayLinkIsRunning(displayLink) {
+        CVDisplayLinkStop(displayLink)
+      }
     }
   }
 }
