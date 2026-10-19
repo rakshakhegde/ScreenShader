@@ -117,7 +117,8 @@ class OverlayController: NSObject, MTKViewDelegate {
       colorspace: screenColorSpace,
       wantsEDR: wantsEDR,
       captureTexturePixelFormat: captureTexturePixelFormat,
-      backingScaleFactor: self.targetScreen.backingScaleFactor
+      backingScaleFactor: self.targetScreen.backingScaleFactor,
+      screenFrame: self.targetScreen.frame
     )
   }
   
@@ -192,12 +193,11 @@ class OverlayController: NSObject, MTKViewDelegate {
     }
 
     guard let contentBuffer = contentBufferToRender,
-          let window = self.window,
           let renderer = self.renderer else {
       return
     }
 
-    renderer.renderContentBuffer(window: window, contentBuffer: contentBuffer)
+    renderer.renderContentBuffer(contentBuffer: contentBuffer)
     if let frameID = frameIDToRender {
         self.metrics.recordRender(frameID: frameID)
     }

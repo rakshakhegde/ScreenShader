@@ -31,6 +31,8 @@ class MetalRenderer {
 
   private let renderTargetPixelFormat: MTLPixelFormat
   private let captureTexturePixelFormat: MTLPixelFormat
+  private let metalLayer: CAMetalLayer
+  private var screenFrame: CGRect
 
   init(
     metalLayer: CAMetalLayer,
@@ -38,12 +40,15 @@ class MetalRenderer {
     colorspace: CGColorSpace,
     wantsEDR: Bool,
     captureTexturePixelFormat: MTLPixelFormat,
-    backingScaleFactor: CGFloat
+    backingScaleFactor: CGFloat,
+    screenFrame: CGRect
   ) {
     guard let device = MTLCreateSystemDefaultDevice() else {
       fatalError("Unable to access a Metal device on this system.")
     }
     self.device = device
+    self.metalLayer = metalLayer
+    self.screenFrame = screenFrame
 
     guard let queue = self.device.makeCommandQueue() else {
       fatalError("Could not create command queue.")
@@ -271,9 +276,8 @@ class MetalRenderer {
     }
   }
 
-  func renderContentBuffer(window: NSWindow, contentBuffer: CVPixelBuffer) {
-    guard let metalView = window.contentView as? MetalView,
-          let drawable = metalView.metalLayer.nextDrawable() else {
+  func renderContentBuffer(contentBuffer: CVPixelBuffer) {
+    guard let drawable = self.metalLayer.nextDrawable() else {
       return
     }
 
@@ -316,64 +320,62 @@ class MetalRenderer {
     pass1Descriptor.colorAttachments[0].storeAction = .store
     
     if let encoder1 = commandBuffer.makeRenderCommandEncoder(descriptor: pass1Descriptor) {
-        if let screen = window.screen {
-            if let ptPipeline = self.passthroughPipeline {
-                encoder1.setRenderPipelineState(ptPipeline)
-                encoder1.setFragmentTexture(texture, index: 0)
+        if let ptPipeline = self.passthroughPipeline {
+            encoder1.setRenderPipelineState(ptPipeline)
+            encoder1.setFragmentTexture(texture, index: 0)
+            encoder1.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
+        }
+        
+        if let cursorPipeline = self.cursorPipeline, let tracker = self.cursorTracker {
+            let cursorData = tracker.currentData
+            if let cursorTex = cursorData.texture {
+                let cgLoc = CGEvent(source: CGEventSource(stateID: .hidSystemState))?.location ?? .zero
+                let mainScreenHeight = CGDisplayBounds(CGMainDisplayID()).height
+                let globalMouse = NSPoint(x: cgLoc.x, y: CGFloat(mainScreenHeight) - cgLoc.y)
+                let mx = Float(globalMouse.x - self.screenFrame.origin.x)
+                let my = Float(globalMouse.y - self.screenFrame.origin.y)
+                let sw = Float(self.screenFrame.width)
+                let sh = Float(self.screenFrame.height)
+                
+                let cw_points = Float(cursorData.size.width) * self.customCursorScale
+                let ch_points = Float(cursorData.size.height) * self.customCursorScale
+                let hsX = Float(cursorData.hotSpot.x) * self.customCursorScale
+                let hsY = Float(cursorData.hotSpot.y) * self.customCursorScale
+                
+                let ndcWidth = 2.0 / sw
+                let ndcHeight = 2.0 / sh
+                
+                let left = (mx - hsX) * ndcWidth - 1.0
+                let right = (mx - hsX + cw_points) * ndcWidth - 1.0
+                
+                let top = (my + hsY) * ndcHeight - 1.0
+                let bottom = (my + hsY - ch_points) * ndcHeight - 1.0
+                
+                var quadVertices: [vector_float2] = [
+                    vector_float2(left, bottom),
+                    vector_float2(right, bottom),
+                    vector_float2(left, top),
+                    vector_float2(left, top),
+                    vector_float2(right, bottom),
+                    vector_float2(right, top)
+                ]
+                
+                var texCoords: [vector_float2] = [
+                    vector_float2(0, 1),
+                    vector_float2(1, 1),
+                    vector_float2(0, 0),
+                    vector_float2(0, 0),
+                    vector_float2(1, 1),
+                    vector_float2(1, 0)
+                ]
+                
+                encoder1.setRenderPipelineState(cursorPipeline)
+                encoder1.setFragmentTexture(cursorTex, index: 0)
+                encoder1.setVertexBytes(&quadVertices, length: MemoryLayout<vector_float2>.stride * 6, index: 0)
+                encoder1.setVertexBytes(&texCoords, length: MemoryLayout<vector_float2>.stride * 6, index: 1)
+                var cursorOpacity = Float(cursorData.opacity)
+                encoder1.setFragmentBytes(&cursorOpacity, length: MemoryLayout<Float>.stride, index: 0)
                 encoder1.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
-            }
-            
-            if let cursorPipeline = self.cursorPipeline, let tracker = self.cursorTracker {
-                let cursorData = tracker.currentData
-                if let cursorTex = cursorData.texture {
-                    let cgLoc = CGEvent(source: CGEventSource(stateID: .hidSystemState))?.location ?? .zero
-                    let mainScreenHeight = CGDisplayBounds(CGMainDisplayID()).height
-                    let globalMouse = NSPoint(x: cgLoc.x, y: CGFloat(mainScreenHeight) - cgLoc.y)
-                    let mx = Float(globalMouse.x - screen.frame.origin.x)
-                    let my = Float(globalMouse.y - screen.frame.origin.y)
-                    let sw = Float(screen.frame.width)
-                    let sh = Float(screen.frame.height)
-                    
-                    let cw_points = Float(cursorData.size.width) * self.customCursorScale
-                    let ch_points = Float(cursorData.size.height) * self.customCursorScale
-                    let hsX = Float(cursorData.hotSpot.x) * self.customCursorScale
-                    let hsY = Float(cursorData.hotSpot.y) * self.customCursorScale
-                    
-                    let ndcWidth = 2.0 / sw
-                    let ndcHeight = 2.0 / sh
-                    
-                    let left = (mx - hsX) * ndcWidth - 1.0
-                    let right = (mx - hsX + cw_points) * ndcWidth - 1.0
-                    
-                    let top = (my + hsY) * ndcHeight - 1.0
-                    let bottom = (my + hsY - ch_points) * ndcHeight - 1.0
-                    
-                    var quadVertices: [vector_float2] = [
-                        vector_float2(left, bottom),
-                        vector_float2(right, bottom),
-                        vector_float2(left, top),
-                        vector_float2(left, top),
-                        vector_float2(right, bottom),
-                        vector_float2(right, top)
-                    ]
-                    
-                    var texCoords: [vector_float2] = [
-                        vector_float2(0, 1),
-                        vector_float2(1, 1),
-                        vector_float2(0, 0),
-                        vector_float2(0, 0),
-                        vector_float2(1, 1),
-                        vector_float2(1, 0)
-                    ]
-                    
-                    encoder1.setRenderPipelineState(cursorPipeline)
-                    encoder1.setFragmentTexture(cursorTex, index: 0)
-                    encoder1.setVertexBytes(&quadVertices, length: MemoryLayout<vector_float2>.stride * 6, index: 0)
-                    encoder1.setVertexBytes(&texCoords, length: MemoryLayout<vector_float2>.stride * 6, index: 1)
-                    var cursorOpacity = Float(cursorData.opacity)
-                    encoder1.setFragmentBytes(&cursorOpacity, length: MemoryLayout<Float>.stride, index: 0)
-                    encoder1.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
-                }
             }
         }
         encoder1.endEncoding()
@@ -385,38 +387,40 @@ class MetalRenderer {
     pass2Descriptor.colorAttachments[0].storeAction = .store
     
     if let encoder2 = commandBuffer.makeRenderCommandEncoder(descriptor: pass2Descriptor) {
-        if let screen = window.screen {
-            if let renderPipeline = self.renderPipeline {
-                struct RenderUniforms {
-                    var screenSize: vector_float2
-                    var mousePosition: vector_float2
-                    var time: Float
-                    var padding: Float = 0
-                }
-                
-                let screenSize = vector_float2(Float(screen.frame.width), Float(screen.frame.height))
-                let cgLoc2 = CGEvent(source: CGEventSource(stateID: .hidSystemState))?.location ?? .zero
-                let mainScreenHeight2 = CGDisplayBounds(CGMainDisplayID()).height
-                let globalMouse = NSPoint(x: cgLoc2.x, y: CGFloat(mainScreenHeight2) - cgLoc2.y)
-                let mousePosition = vector_float2(
-                  Float(globalMouse.x - screen.frame.origin.x), 
-                  Float(globalMouse.y - screen.frame.origin.y))
-                let time = Float(ProcessInfo.processInfo.systemUptime)
-
-                var uniforms = RenderUniforms(screenSize: screenSize, mousePosition: mousePosition, time: time)
-
-                encoder2.setRenderPipelineState(renderPipeline)
-                encoder2.setFragmentTexture(intermediateTexture, index: 0)
-                encoder2.setFragmentBytes(&uniforms, length: MemoryLayout<RenderUniforms>.stride, index: 0)
-
-                encoder2.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
+        if let renderPipeline = self.renderPipeline {
+            struct RenderUniforms {
+                var screenSize: vector_float2
+                var mousePosition: vector_float2
+                var time: Float
+                var padding: Float = 0
             }
+            
+            let screenSize = vector_float2(Float(self.screenFrame.width), Float(self.screenFrame.height))
+            let cgLoc2 = CGEvent(source: CGEventSource(stateID: .hidSystemState))?.location ?? .zero
+            let mainScreenHeight2 = CGDisplayBounds(CGMainDisplayID()).height
+            let globalMouse = NSPoint(x: cgLoc2.x, y: CGFloat(mainScreenHeight2) - cgLoc2.y)
+            let mousePosition = vector_float2(
+              Float(globalMouse.x - self.screenFrame.origin.x), 
+              Float(globalMouse.y - self.screenFrame.origin.y))
+            let time = Float(ProcessInfo.processInfo.systemUptime)
+
+            var uniforms = RenderUniforms(screenSize: screenSize, mousePosition: mousePosition, time: time)
+
+            encoder2.setRenderPipelineState(renderPipeline)
+            encoder2.setFragmentTexture(intermediateTexture, index: 0)
+            encoder2.setFragmentBytes(&uniforms, length: MemoryLayout<RenderUniforms>.stride, index: 0)
+
+            encoder2.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
         }
         encoder2.endEncoding()
     }
 
     commandBuffer.present(drawable)
     commandBuffer.commit()
+  }
+
+  func updateScreenFrame(_ frame: CGRect) {
+    self.screenFrame = frame
   }
 
   func updateScaleFactor(metalLayer: CAMetalLayer, backingScaleFactor: CGFloat) {
