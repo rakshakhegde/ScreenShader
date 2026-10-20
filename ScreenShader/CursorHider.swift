@@ -35,9 +35,6 @@ class CursorHider {
         _ = CGSSetConnectionProperty(cid, cid, "SetsCursorInBackground" as CFString, kCFBooleanTrue)
         transparentCursor.push()
         
-        CGDisplayHideCursor(CGMainDisplayID())
-        _ = CGSSetDebugOptions(kCGSDisableCursor)
-        
         enforceTimer = Timer.scheduledTimer(timeInterval: 0.05, target: self, selector: #selector(aggressivelyHide), userInfo: nil, repeats: true)
         if let timer = enforceTimer {
             RunLoop.main.add(timer, forMode: .common)
