@@ -23,6 +23,7 @@ class CursorHider {
     }()
     private var enforceTimer: Timer?
     private let kCGSDisableCursor: Int32 = 0x08000000
+    private var hideCount = 0
     private var isHiding = false
     
     private init() {}
@@ -43,6 +44,7 @@ class CursorHider {
     
     @objc private func aggressivelyHide() {
         CGDisplayHideCursor(CGMainDisplayID())
+        hideCount += 1
     }
     
     func stopHiding() {
@@ -65,6 +67,11 @@ class CursorHider {
         NSCursor.pop()
         
         _ = CGSSetDebugOptions(0)
+        
+        for _ in 0..<hideCount {
+            CGDisplayShowCursor(CGMainDisplayID())
+        }
+        hideCount = 0
         
         // Hard-reset the cursor connection
         CGAssociateMouseAndMouseCursorPosition(0)
