@@ -226,7 +226,8 @@ class OverlayController: NSObject, MTKViewDelegate {
         let globalMouse = NSPoint(x: cgLoc.x, y: CGFloat(mainScreenHeight) - cgLoc.y)
 
         // Skip render if the mouse is outside this display, or if mouse hasn't moved since last render
-        if !self.targetScreen.frame.contains(globalMouse) || globalMouse == self.lastRenderedMouseLocation {
+        let screenBounds = self.targetScreen.frame.insetBy(dx: -2.0, dy: -2.0)
+        if !screenBounds.contains(globalMouse) || globalMouse == self.lastRenderedMouseLocation {
           return
         }
       }

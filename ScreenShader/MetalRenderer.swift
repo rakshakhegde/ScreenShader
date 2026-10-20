@@ -297,8 +297,9 @@ class MetalRenderer {
     let mainScreenHeight = CGDisplayBounds(CGMainDisplayID()).height
     let globalMouse = NSPoint(x: cgLoc.x, y: CGFloat(mainScreenHeight) - cgLoc.y)
 
-    // Only render cursor if the mouse is physically within this screen
-    guard self.screenFrame.contains(globalMouse) else {
+    // Only render cursor if the mouse is physically within this screen (with tolerance for edge pixels)
+    let screenBounds = self.screenFrame.insetBy(dx: -2.0, dy: -2.0)
+    guard screenBounds.contains(globalMouse) else {
       return nil
     }
 
