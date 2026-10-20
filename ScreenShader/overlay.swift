@@ -82,6 +82,19 @@ class OverlayController: NSObject, MTKViewDelegate {
     self.screenCapture.onFrameReceived = { [weak self] contentBuffer, captureTime in
       self?.receiveFrame(contentBuffer: contentBuffer, captureTime: captureTime)
     }
+    self.screenCapture.onCaptureFailed = { [weak self] in
+      guard let self = self else { return }
+      Logger.shared.log("OverlayController[display \(self.targetDisplayID)]: Capture failed/halted - turning off effect overlay for this display.")
+      self.window?.orderOut(nil)
+    }
+    self.screenCapture.onCaptureRestored = { [weak self] in
+      guard let self = self else { return }
+      let activeEffect = self.config.effects.getActiveEffect()
+      if activeEffect != nil {
+        Logger.shared.log("OverlayController[display \(self.targetDisplayID)]: Capture restored - revealing effect overlay.")
+        self.window?.orderFrontRegardless()
+      }
+    }
   }
 
   private func usesSRGBTransfer(colorSpaceName: CFString?) -> Bool {
@@ -226,9 +239,10 @@ class OverlayController: NSObject, MTKViewDelegate {
           let dt = now - self.lastRenderTime
           self.lastRenderTime = now
           self.renderFrameCount += 1
-          if dt > 0.05 && self.renderFrameCount > 5 {
-            Logger.shared.log("OverlayController[display \(self.targetDisplayID)] render GAP: \(Int(dt * 1000))ms! renderCount=\(self.renderFrameCount)")
-          }
+          // Commented out render gap log to prevent disk write saturation
+          // if dt > 0.05 && self.renderFrameCount > 5 {
+          //   Logger.shared.log("OverlayController[display \(self.targetDisplayID)] render GAP: \(Int(dt * 1000))ms! renderCount=\(self.renderFrameCount)")
+          // }
           self.metrics.recordRender(frameID: frameID)
       }
     }
