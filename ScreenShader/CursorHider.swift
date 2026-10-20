@@ -42,7 +42,6 @@ class CursorHider {
     }
     
     @objc private func aggressivelyHide() {
-        _ = CGSSetDebugOptions(kCGSDisableCursor)
         CGDisplayHideCursor(CGMainDisplayID())
     }
     
