@@ -238,7 +238,6 @@ class OverlayController: NSObject, MTKViewDelegate {
       renderer.renderContentBuffer(contentBuffer: contentBuffer)
       if let frameID = frameIDToRender {
           let now = CACurrentMediaTime()
-          let dt = now - self.lastRenderTime
           self.lastRenderTime = now
           self.renderFrameCount += 1
           // Commented out render gap log to prevent disk write saturation
