@@ -127,8 +127,35 @@ class EffectViewController: NSViewController, NSTextFieldDelegate, NSTextViewDel
   }
 
   @objc func deleteEffect() {
-    self.effects.delete(effect: self.effect)
-    self.onDelete()
+    let effectName = self.effects.getName(effect: self.effect)
+    let alert = NSAlert()
+    alert.messageText = "Delete “\(effectName)”?"
+    alert.informativeText = "Are you sure you want to delete this effect? This action cannot be undone."
+    alert.alertStyle = .critical
+
+    let deleteButton = alert.addButton(withTitle: "Delete")
+    deleteButton.hasDestructiveAction = true
+
+    let cancelButton = alert.addButton(withTitle: "Cancel")
+    cancelButton.keyEquivalent = "\u{1b}"
+
+    let performDelete = { [weak self] in
+      guard let self = self else { return }
+      self.effects.delete(effect: self.effect)
+      self.onDelete()
+    }
+
+    if let window = self.view.window {
+      alert.beginSheetModal(for: window) { response in
+        if response == .alertFirstButtonReturn {
+          performDelete()
+        }
+      }
+    } else {
+      if alert.runModal() == .alertFirstButtonReturn {
+        performDelete()
+      }
+    }
   }
 
   @objc func onSaveButton() {

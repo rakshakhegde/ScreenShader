@@ -81,9 +81,7 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
     self.tableView.dataSource = self
     self.tableView.headerView = nil
     self.tableView.focusRingType = .none
-    if #available(macOS 11.0, *) {
-        self.tableView.style = .sourceList
-    }
+    self.tableView.style = .sourceList
     self.tableView.rowHeight = 32
     self.tableView.intercellSpacing = NSSize(width: 0, height: 8)
 
