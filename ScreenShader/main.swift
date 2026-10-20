@@ -14,6 +14,8 @@ class ScreenManager: NSObject {
   private var pendingScreenChange: DispatchWorkItem?
   private var isSleeping: Bool = false
 
+  var onCompilationError: ((UUID) -> Void)?
+
   init(config: Config, metrics: Metrics, errorMessage: ErrorMessage) {
     self.config = config
     self.metrics = metrics
@@ -147,6 +149,9 @@ class ScreenManager: NSObject {
             metrics: self.metrics,
             errorMessage: self.errorMessage
         )
+        newController.onCompilationError = { [weak self] effectID in
+          self?.onCompilationError?(effectID)
+        }
         
         overlayControllers[displayID] = newController
         screenSignatures[displayID] = newSignature
@@ -214,6 +219,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     createMenuBarIcon()
 
     self.screenManager = ScreenManager(config: self.config, metrics: self.metrics, errorMessage: self.errorMessage)
+    self.screenManager.onCompilationError = { [weak self] effectID in
+      DispatchQueue.main.async {
+        self?.configWindowController?.highlightEffect(id: effectID)
+      }
+    }
 
     HotKeyManager.shared.toggleAction = { [weak self] in
       DispatchQueue.main.async {

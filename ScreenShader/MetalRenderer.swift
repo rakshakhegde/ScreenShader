@@ -4,6 +4,15 @@ import Metal
 import MetalKit
 import ApplicationServices
 
+struct ShaderCompilationError: LocalizedError {
+  let effectID: UUID
+  let underlyingError: Error
+
+  var errorDescription: String? {
+    return self.underlyingError.localizedDescription
+  }
+}
+
 class MetalView: MTKView {
   var metalLayer: CAMetalLayer {
     return self.layer as! CAMetalLayer
@@ -18,16 +27,16 @@ class MetalRenderer {
   private let commandQueue: MTLCommandQueue
   private var textureCache: CVMetalTextureCache!
   
-  private var activeEffectSource: String? = nil
-  private var renderPipeline: MTLRenderPipelineState? = nil
+  private var activeSources: [(id: UUID, source: String)] = []
+  private var renderPipelines: [MTLRenderPipelineState] = []
   
   private var passthroughPipeline: MTLRenderPipelineState? = nil
   private var cursorPipeline: MTLRenderPipelineState? = nil
   var cursorTracker: CursorTracker? = nil
   var customCursorScale: Float = 1.0
   
-  
-  private var intermediateTexture: MTLTexture? = nil
+  private var intermediateTextureA: MTLTexture? = nil
+  private var intermediateTextureB: MTLTexture? = nil
 
   private let renderTargetPixelFormat: MTLPixelFormat
   private let captureTexturePixelFormat: MTLPixelFormat
@@ -80,8 +89,8 @@ class MetalRenderer {
     }
     
     do {
-      self.passthroughPipeline = try Self.buildPassthroughPipeline(device: self.device, pixelFormat: captureTexturePixelFormat)
-      self.cursorPipeline = try Self.buildCursorRenderPipeline(device: self.device, pixelFormat: captureTexturePixelFormat)
+      self.passthroughPipeline = try Self.buildPassthroughPipeline(device: self.device, pixelFormat: drawablePixelFormat)
+      self.cursorPipeline = try Self.buildCursorRenderPipeline(device: self.device, pixelFormat: drawablePixelFormat)
     } catch {
       print("Failed to build base pipelines: \(error)")
     }
@@ -260,25 +269,46 @@ class MetalRenderer {
 
 
 
-  func setEffectSource(_ effectSource: String?) throws {
-    guard let effectSource = effectSource else {
-      self.activeEffectSource = nil
-      self.renderPipeline = nil
+  func setEffectSources(_ sources: [(id: UUID, source: String)]) throws {
+    guard !sources.isEmpty else {
+      self.activeSources = []
+      self.renderPipelines = []
       return
     }
-    if effectSource == self.activeEffectSource && self.renderPipeline != nil {
+
+    if sources.count == self.activeSources.count &&
+       zip(sources, self.activeSources).allSatisfy({ $0.0.id == $0.1.id && $0.0.source == $0.1.source }) &&
+       !self.renderPipelines.isEmpty {
       return
     }
-    self.activeEffectSource = effectSource
-    do {
-      self.renderPipeline = try Self.buildRenderPipeline(
-        device: self.device,
-        effectSource: effectSource,
-        pixelFormat: self.renderTargetPixelFormat
-      )
-    } catch {
-      self.renderPipeline = nil
-      throw error
+
+    var newPipelines: [MTLRenderPipelineState] = []
+    for item in sources {
+      do {
+        let pipeline = try Self.buildRenderPipeline(
+          device: self.device,
+          effectSource: item.source,
+          pixelFormat: self.renderTargetPixelFormat
+        )
+        newPipelines.append(pipeline)
+      } catch {
+        self.renderPipelines = []
+        self.activeSources = []
+        throw ShaderCompilationError(effectID: item.id, underlyingError: error)
+      }
+    }
+    self.renderPipelines = newPipelines
+    self.activeSources = sources
+  }
+
+  private func ensureIntermediateTextures(width: Int, height: Int) {
+    if self.intermediateTextureA?.width != width || self.intermediateTextureA?.height != height {
+      let desc = MTLTextureDescriptor.texture2DDescriptor(
+        pixelFormat: self.renderTargetPixelFormat, width: width, height: height, mipmapped: false)
+      desc.usage = [.renderTarget, .shaderRead]
+      desc.storageMode = .private
+      self.intermediateTextureA = self.device.makeTexture(descriptor: desc)
+      self.intermediateTextureB = self.device.makeTexture(descriptor: desc)
     }
   }
 
@@ -308,15 +338,8 @@ class MetalRenderer {
       return nil
     }
 
-    if self.intermediateTexture?.width != width || self.intermediateTexture?.height != height {
-      let desc = MTLTextureDescriptor.texture2DDescriptor(
-        pixelFormat: self.captureTexturePixelFormat, width: width, height: height, mipmapped: false)
-      desc.usage = [.renderTarget, .shaderRead]
-      desc.storageMode = .private
-      self.intermediateTexture = self.device.makeTexture(descriptor: desc)
-    }
-
-    guard let intermediateTexture = self.intermediateTexture else {
+    self.ensureIntermediateTextures(width: width, height: height)
+    guard let intermediateTexture = self.intermediateTextureA else {
       return nil
     }
 
@@ -393,38 +416,30 @@ class MetalRenderer {
 
   private func encodeEffectPass(
     commandBuffer: MTLCommandBuffer,
+    pipeline: MTLRenderPipelineState,
     sourceTexture: MTLTexture,
-    destinationTexture: MTLTexture
+    destinationTexture: MTLTexture,
+    uniforms: inout RenderUniforms
   ) {
-    guard let renderPipeline = self.renderPipeline else { return }
+    let passDescriptor = MTLRenderPassDescriptor()
+    passDescriptor.colorAttachments[0].texture = destinationTexture
+    passDescriptor.colorAttachments[0].loadAction = .dontCare
+    passDescriptor.colorAttachments[0].storeAction = .store
 
-    let pass2Descriptor = MTLRenderPassDescriptor()
-    pass2Descriptor.colorAttachments[0].texture = destinationTexture
-    pass2Descriptor.colorAttachments[0].loadAction = .dontCare
-    pass2Descriptor.colorAttachments[0].storeAction = .store
+    guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: passDescriptor) else { return }
 
-    guard let encoder2 = commandBuffer.makeRenderCommandEncoder(descriptor: pass2Descriptor) else { return }
-
-    let screenSize = vector_float2(Float(self.screenFrame.width), Float(self.screenFrame.height))
-    let cgLoc2 = CGEvent(source: CGEventSource(stateID: .hidSystemState))?.location ?? .zero
-    let mainScreenHeight2 = CGDisplayBounds(CGMainDisplayID()).height
-    let globalMouse = NSPoint(x: cgLoc2.x, y: CGFloat(mainScreenHeight2) - cgLoc2.y)
-    let mousePosition = vector_float2(
-      Float(globalMouse.x - self.screenFrame.origin.x),
-      Float(globalMouse.y - self.screenFrame.origin.y)
-    )
-    let time = Float(ProcessInfo.processInfo.systemUptime)
-
-    var uniforms = RenderUniforms(screenSize: screenSize, mousePosition: mousePosition, time: time)
-
-    encoder2.setRenderPipelineState(renderPipeline)
-    encoder2.setFragmentTexture(sourceTexture, index: 0)
-    encoder2.setFragmentBytes(&uniforms, length: MemoryLayout<RenderUniforms>.stride, index: 0)
-    encoder2.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
-    encoder2.endEncoding()
+    encoder.setRenderPipelineState(pipeline)
+    encoder.setFragmentTexture(sourceTexture, index: 0)
+    encoder.setFragmentBytes(&uniforms, length: MemoryLayout<RenderUniforms>.stride, index: 0)
+    encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
+    encoder.endEncoding()
   }
 
   func renderContentBuffer(contentBuffer: CVPixelBuffer) {
+    guard !self.renderPipelines.isEmpty else {
+      return
+    }
+
     guard let drawable = self.metalLayer.nextDrawable() else {
       return
     }
@@ -454,20 +469,55 @@ class MetalRenderer {
       return
     }
 
-    // Pass 1: Render cursor into intermediate texture only if cursor is active and on this screen
-    let sourceTexture = self.encodeCursorPass(
+    // Pass 1: Render cursor into intermediateTextureA only if cursor is active and on this screen
+    var currentSource = self.encodeCursorPass(
       commandBuffer: commandBuffer,
       baseTexture: texture,
       width: width,
       height: height
     ) ?? texture
 
-    // Pass 2: Render active effect from sourceTexture to drawable
-    self.encodeEffectPass(
-      commandBuffer: commandBuffer,
-      sourceTexture: sourceTexture,
-      destinationTexture: drawable.texture
+    let screenSize = vector_float2(Float(self.screenFrame.width), Float(self.screenFrame.height))
+    let cgLoc = CGEvent(source: CGEventSource(stateID: .hidSystemState))?.location ?? .zero
+    let mainScreenHeight = CGDisplayBounds(CGMainDisplayID()).height
+    let globalMouse = NSPoint(x: cgLoc.x, y: CGFloat(mainScreenHeight) - cgLoc.y)
+    let mousePosition = vector_float2(
+      Float(globalMouse.x - self.screenFrame.origin.x),
+      Float(globalMouse.y - self.screenFrame.origin.y)
     )
+    let time = Float(ProcessInfo.processInfo.systemUptime)
+    var uniforms = RenderUniforms(screenSize: screenSize, mousePosition: mousePosition, time: time)
+
+    let totalPasses = self.renderPipelines.count
+    if totalPasses > 1 {
+      self.ensureIntermediateTextures(width: width, height: height)
+      guard self.intermediateTextureA != nil && self.intermediateTextureB != nil else {
+        return
+      }
+    }
+
+    for (index, pipeline) in self.renderPipelines.enumerated() {
+      let isLast = (index == totalPasses - 1)
+      let destinationTexture: MTLTexture
+      if isLast {
+        destinationTexture = drawable.texture
+      } else {
+        if currentSource === self.intermediateTextureA {
+          destinationTexture = self.intermediateTextureB!
+        } else {
+          destinationTexture = self.intermediateTextureA!
+        }
+      }
+
+      self.encodeEffectPass(
+        commandBuffer: commandBuffer,
+        pipeline: pipeline,
+        sourceTexture: currentSource,
+        destinationTexture: destinationTexture,
+        uniforms: &uniforms
+      )
+      currentSource = destinationTexture
+    }
 
     commandBuffer.present(drawable)
     commandBuffer.commit()

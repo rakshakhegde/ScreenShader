@@ -65,6 +65,7 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
   private var customCursorSliderStack: NSStackView! = nil
   private var contentPane: NSView! = nil
   private var effectToController: [UUID: EffectViewController] = [:]
+  private var pendingHighlightID: UUID? = nil
 
   @objc private func onSliderChange() {
     self.config.customCursorScale = Float(self.customCursorSlider.doubleValue)
@@ -190,7 +191,10 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
 
     self.view = splitView
     let effectList = self.effects.effectList()
-    if let target = self.effects.getActiveEffect() ?? self.effects.getMostRecentActiveEffect(),
+    if let pending = self.pendingHighlightID, let index = effectList.firstIndex(of: pending) {
+      self.pendingHighlightID = nil
+      self.selectTab(index: index)
+    } else if let target = self.effects.getActiveEffect() ?? self.effects.getMostRecentActiveEffect(),
        let index = effectList.firstIndex(of: target) {
       self.selectTab(index: index)
     } else if !effectList.isEmpty {
@@ -198,10 +202,21 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
     }
   }
 
-  private func selectTab(index: Int) {
+  func selectTab(index: Int) {
     self.tableView.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
     self.tableView.scrollRowToVisible(index)
+    self.updateDetailView(for: index)
     self.view.window?.makeFirstResponder(self.tableView)
+  }
+
+  func highlightEffect(id: UUID) {
+    if self.isViewLoaded {
+      if let index = self.effects.effectList().firstIndex(of: id) {
+        self.selectTab(index: index)
+      }
+    } else {
+      self.pendingHighlightID = id
+    }
   }
 
   @objc private func newEffect() {
@@ -385,5 +400,9 @@ class ConfigWindowController: NSWindowController {
 
   func refreshActiveEffects() {
     self.configViewController.refreshActiveEffects()
+  }
+
+  func highlightEffect(id: UUID) {
+    self.configViewController.highlightEffect(id: id)
   }
 }

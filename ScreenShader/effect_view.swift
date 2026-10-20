@@ -56,7 +56,7 @@ class EffectViewController: NSViewController, NSTextFieldDelegate, NSTextViewDel
 
     // Active button on the left
     self.activeButton = NSButton(
-        checkboxWithTitle: "Active (only one effect can be active at a time)",
+        checkboxWithTitle: "Active (up to 5 effects can be active simultaneously)",
         target: self,
         action: #selector(self.toggleActive)
     )
@@ -123,6 +123,7 @@ class EffectViewController: NSViewController, NSTextFieldDelegate, NSTextViewDel
 
   @objc func toggleActive() {
     self.effects.toggleActive(effect: self.effect)
+    self.refreshActiveCheckbox()
     self.onUpdate()
   }
 

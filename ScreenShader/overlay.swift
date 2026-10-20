@@ -21,6 +21,8 @@ class OverlayController: NSObject, MTKViewDelegate {
   private var targetScreen: NSScreen
   private var targetDisplayID: CGDirectDisplayID
 
+  var onCompilationError: ((UUID) -> Void)?
+
   init(targetScreen: NSScreen, targetDisplayID: CGDirectDisplayID, config: Config, metrics: Metrics, errorMessage: ErrorMessage) {
     self.targetScreen = targetScreen
     self.targetDisplayID = targetDisplayID
@@ -88,8 +90,7 @@ class OverlayController: NSObject, MTKViewDelegate {
     }
     self.screenCapture.onCaptureRestored = { [weak self] in
       guard let self = self else { return }
-      let activeEffect = self.config.effects.getActiveEffect()
-      if activeEffect != nil && self.errorMessage.get() == nil {
+      if self.config.effects.anyEffectActive() && self.errorMessage.get() == nil {
         Logger.shared.log("OverlayController[display \(self.targetDisplayID)]: Capture restored - revealing effect overlay.")
         self.window?.orderFrontRegardless()
       }
@@ -172,8 +173,7 @@ class OverlayController: NSObject, MTKViewDelegate {
   }
 
   func restartCapture() {
-      let activeEffect = self.config.effects.getActiveEffect()
-      guard activeEffect != nil && self.errorMessage.get() == nil else { return }
+      guard self.config.effects.anyEffectActive() && self.errorMessage.get() == nil else { return }
       if let displayLink = self.displayLink, !CVDisplayLinkIsRunning(displayLink) {
           CVDisplayLinkStart(displayLink)
       }
@@ -250,14 +250,16 @@ class OverlayController: NSObject, MTKViewDelegate {
   }
 
   func refreshConfig() {
-    let activeEffect = self.config.effects.getActiveEffect()
-    let active = activeEffect != nil
+    let activeEffects = self.config.effects.getActiveEffects()
+    let active = !activeEffects.isEmpty
 
-    let activeEffectShader = active ? self.config.effects.getShader(effect: activeEffect!) : nil
+    let activeSources: [(id: UUID, source: String)] = activeEffects.map {
+      ($0, self.config.effects.getShader(effect: $0))
+    }
 
     var compilationFailed = false
     do {
-      try self.renderer.setEffectSource(activeEffectShader)
+      try self.renderer.setEffectSources(activeSources)
       
       if self.config.useCustomCursor && self.renderer.cursorTracker == nil {
           self.renderer.cursorTracker = CursorTracker(device: self.renderer.device)
@@ -267,6 +269,12 @@ class OverlayController: NSObject, MTKViewDelegate {
       self.renderer.customCursorScale = self.config.customCursorScale
       
       self.errorMessage.clear()
+    } catch let error as ShaderCompilationError {
+      compilationFailed = true
+      print("Effect shader error: \(error.localizedDescription)")
+      self.errorMessage.set(error.localizedDescription)
+      self.onCompilationError?(error.effectID)
+      CursorHider.shared.stopHiding()
     } catch {
       compilationFailed = true
       print("Effect shader error: \(error.localizedDescription)")
@@ -285,7 +293,7 @@ class OverlayController: NSObject, MTKViewDelegate {
       if !self.window.isVisible {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
           guard let self = self else { return }
-          if self.config.effects.getActiveEffect() != nil && self.errorMessage.get() == nil {
+          if self.config.effects.anyEffectActive() && self.errorMessage.get() == nil {
             self.window?.setIsVisible(true)
           }
         }

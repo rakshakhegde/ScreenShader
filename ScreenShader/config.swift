@@ -281,6 +281,7 @@ class Effects: Codable {
     if let index = self.effects.firstIndex(of: effect) {
       self.effects.remove(at: index)
       self.deletedEffects.append(effect)
+      self.effectToActive.removeValue(forKey: effect)
       if self.mostRecentActiveEffect == effect {
         self.mostRecentActiveEffect = nil
       }
@@ -296,13 +297,13 @@ class Effects: Codable {
   }
 
   func isActive(effect: UUID) -> Bool {
-    return self.effectToActive[effect]!
+    return self.effectToActive[effect] ?? false
   }
 
   func setActive(effect: UUID, active: Bool) {
     if active {
-      for otherEffect in self.effects {
-        self.effectToActive[otherEffect] = false
+      if !self.isActive(effect: effect) && self.getActiveEffects().count >= 5 {
+        return
       }
       self.mostRecentActiveEffect = effect
     }
@@ -322,13 +323,12 @@ class Effects: Codable {
     self.effectToShader[effect] = shader
   }
 
+  func getActiveEffects() -> [UUID] {
+    return Array(self.effects.filter { self.isActive(effect: $0) }.prefix(5))
+  }
+
   func getActiveEffect() -> UUID? {
-    for effect in self.effects {
-      if self.isActive(effect: effect) {
-        return effect
-      }
-    }
-    return nil
+    return self.getActiveEffects().first
   }
 
   func getMostRecentActiveEffect() -> UUID? {
@@ -336,20 +336,20 @@ class Effects: Codable {
   }
 
   func anyEffectActive() -> Bool {
-    return self.getActiveEffect() != nil
+    return !self.getActiveEffects().isEmpty
   }
 
   func deactivateAll() {
     for effect in self.effects {
-      self.setActive(effect: effect, active: false)
+      self.effectToActive[effect] = false
     }
   }
 
   func activateDefault() {
-    if let mostRecentActiveEffect = self.mostRecentActiveEffect {
+    if let mostRecentActiveEffect = self.mostRecentActiveEffect, self.effects.contains(mostRecentActiveEffect) {
       self.setActive(effect: mostRecentActiveEffect, active: true)
-    } else if self.effects.count > 0 {
-      self.setActive(effect: self.effects.first!, active: true)
+    } else if let first = self.effects.first {
+      self.setActive(effect: first, active: true)
     }
   }
 }
