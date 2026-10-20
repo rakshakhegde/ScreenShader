@@ -90,7 +90,7 @@ class OverlayController: NSObject, MTKViewDelegate {
     self.screenCapture.onCaptureRestored = { [weak self] in
       guard let self = self else { return }
       let activeEffect = self.config.effects.getActiveEffect()
-      if activeEffect != nil {
+      if activeEffect != nil && self.errorMessage.get() == nil {
         Logger.shared.log("OverlayController[display \(self.targetDisplayID)]: Capture restored - revealing effect overlay.")
         self.window?.orderFrontRegardless()
       }
@@ -173,6 +173,8 @@ class OverlayController: NSObject, MTKViewDelegate {
   }
 
   func restartCapture() {
+      let activeEffect = self.config.effects.getActiveEffect()
+      guard activeEffect != nil && self.errorMessage.get() == nil else { return }
       if let displayLink = self.displayLink, !CVDisplayLinkIsRunning(displayLink) {
           CVDisplayLinkStart(displayLink)
       }
@@ -254,6 +256,7 @@ class OverlayController: NSObject, MTKViewDelegate {
 
     let activeEffectShader = active ? self.config.effects.getShader(effect: activeEffect!) : nil
 
+    var compilationFailed = false
     do {
       try self.renderer.setEffectSource(activeEffectShader)
       
@@ -266,18 +269,26 @@ class OverlayController: NSObject, MTKViewDelegate {
       
       self.errorMessage.clear()
     } catch {
+      compilationFailed = true
       print("Effect shader error: \(error.localizedDescription)")
       self.errorMessage.set(error.localizedDescription)
+      CursorHider.shared.stopHiding()
     }
 
-    // TODO: The window is briefly visible with the previous effect applied.
-    self.window.setIsVisible(active)
-    self.screenCapture.setCapturing(active)
+    let shouldShow = active && !compilationFailed
+
+    // If compilation succeeded and we should show the effect with custom cursor, ensure cursor hiding starts
+    if shouldShow && self.config.useCustomCursor {
+      CursorHider.shared.startHiding()
+    }
+
+    self.window.setIsVisible(shouldShow)
+    self.screenCapture.setCapturing(shouldShow)
 
     if let displayLink = self.displayLink {
-      if active && !CVDisplayLinkIsRunning(displayLink) {
+      if shouldShow && !CVDisplayLinkIsRunning(displayLink) {
         CVDisplayLinkStart(displayLink)
-      } else if !active && CVDisplayLinkIsRunning(displayLink) {
+      } else if !shouldShow && CVDisplayLinkIsRunning(displayLink) {
         CVDisplayLinkStop(displayLink)
       }
     }

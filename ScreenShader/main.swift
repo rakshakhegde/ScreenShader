@@ -230,7 +230,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     self.statusItem.button?.image = self.getMenuBarIcon()
 
     // Manage cursor state BEFORE updating window visibility so WindowServer respects the change
-    if self.config.effects.anyEffectActive() && self.config.useCustomCursor {
+    if self.config.effects.anyEffectActive() && self.config.useCustomCursor && self.errorMessage.get() == nil {
       CursorHider.shared.startHiding()
     } else {
       CursorHider.shared.stopHiding()
