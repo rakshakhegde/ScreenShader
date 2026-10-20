@@ -93,9 +93,8 @@ class ScreenCapture: NSObject, SCStreamDelegate {
           return
         }
 
-        let myPID = ProcessInfo.processInfo.processIdentifier
         let excludedWindows = content.windows.filter { window in
-          window.owningApplication?.processID == myPID || self.excludedWindowIDs.contains(window.windowID)
+          self.excludedWindowIDs.contains(window.windowID)
         }
         let filter = SCContentFilter(display: display, excludingWindows: excludedWindows)
 
