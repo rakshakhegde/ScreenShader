@@ -173,12 +173,12 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
     ])
 
     self.view = splitView
-    if self.effects.effectList().count > 0 {
-      if let activeIndex = self.effects.effectList().firstIndex(where: { self.effects.isActive(effect: $0) }) {
-        self.selectTab(index: activeIndex)
-      } else {
-        self.selectTab(index: 0)
-      }
+    let effectList = self.effects.effectList()
+    if let target = self.effects.getActiveEffect() ?? self.effects.getMostRecentActiveEffect(),
+       let index = effectList.firstIndex(of: target) {
+      self.selectTab(index: index)
+    } else if !effectList.isEmpty {
+      self.selectTab(index: 0)
     }
   }
 
