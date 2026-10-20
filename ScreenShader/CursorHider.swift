@@ -45,6 +45,12 @@ class CursorHider {
     @objc private func aggressivelyHide() {
         CGDisplayHideCursor(CGMainDisplayID())
         hideCount += 1
+        if hideCount > 1000 {
+            for _ in 0..<hideCount - 10 {
+                CGDisplayShowCursor(CGMainDisplayID())
+                hideCount -= 1
+            }
+        }
     }
     
     func stopHiding() {
