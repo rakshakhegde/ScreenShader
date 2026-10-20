@@ -13,6 +13,7 @@ class OverlayController: NSObject, MTKViewDelegate {
   private var displayLink: CVDisplayLink?
   private var contentBuffer: CVPixelBuffer?
   private var frameID: Int?
+  private var lastRenderedMouseLocation: NSPoint?
   private let dispatchQueue = DispatchQueue(label: "overlayController.queue")
 
   private var targetScreen: NSScreen
@@ -198,9 +199,23 @@ class OverlayController: NSObject, MTKViewDelegate {
       return
     }
 
-    if frameIDToRender == nil && renderer.cursorTracker == nil {
-      return
+    if frameIDToRender == nil {
+      guard renderer.cursorTracker != nil else {
+        return
+      }
+      let cgLoc = CGEvent(source: CGEventSource(stateID: .hidSystemState))?.location ?? .zero
+      let mainScreenHeight = CGDisplayBounds(CGMainDisplayID()).height
+      let globalMouse = NSPoint(x: cgLoc.x, y: CGFloat(mainScreenHeight) - cgLoc.y)
+
+      // Skip render if the mouse is outside this display, or if mouse hasn't moved since last render
+      if !self.targetScreen.frame.contains(globalMouse) || globalMouse == self.lastRenderedMouseLocation {
+        return
+      }
     }
+
+    let cgLoc = CGEvent(source: CGEventSource(stateID: .hidSystemState))?.location ?? .zero
+    let mainScreenHeight = CGDisplayBounds(CGMainDisplayID()).height
+    self.lastRenderedMouseLocation = NSPoint(x: cgLoc.x, y: CGFloat(mainScreenHeight) - cgLoc.y)
 
     renderer.renderContentBuffer(contentBuffer: contentBuffer)
     if let frameID = frameIDToRender {

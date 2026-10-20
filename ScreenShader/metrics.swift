@@ -16,12 +16,13 @@ class Metrics {
   var renderFPS: Double = 0
   var averageLatency: Double = 0
 
+  private let idLock = NSLock()
+
   func newFrameID() -> Int {
-    var frameID: Int!
-    self.dispatchQueue.sync {
-      frameID = self.nextFrameID
-      self.nextFrameID += 1
-    }
+    idLock.lock()
+    defer { idLock.unlock() }
+    let frameID = self.nextFrameID
+    self.nextFrameID += 1
     return frameID
   }
 

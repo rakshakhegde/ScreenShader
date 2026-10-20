@@ -48,8 +48,9 @@ class ScreenCapture: NSObject, SCStreamDelegate {
 
         Logger.shared.log("startCapture: Selected display - displayID: \(display.displayID), width: \(display.width), height: \(display.height)")
 
+        let myPID = ProcessInfo.processInfo.processIdentifier
         let excludedWindows = content.windows.filter { window in
-          self.excludedWindowIDs.contains(window.windowID)
+          window.owningApplication?.processID == myPID || self.excludedWindowIDs.contains(window.windowID)
         }
         Logger.shared.log("startCapture: Excluded windows count: \(excludedWindows.count), target IDs: \(self.excludedWindowIDs)")
         let filter = SCContentFilter(display: display, excludingWindows: excludedWindows)
