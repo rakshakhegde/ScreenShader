@@ -165,6 +165,14 @@ class ScreenManager: NSObject {
       controller.refreshConfig()
     }
   }
+
+  func stopAll() {
+    for (_, controller) in overlayControllers {
+      controller.stopAndTearDown()
+    }
+    overlayControllers.removeAll()
+    screenSignatures.removeAll()
+  }
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -207,13 +215,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     self.screenManager = ScreenManager(config: self.config, metrics: self.metrics, errorMessage: self.errorMessage)
 
-    HotKeyManager.shared.toggleAction = {
-      NSApp.terminate(nil)
+    HotKeyManager.shared.toggleAction = { [weak self] in
+      DispatchQueue.main.async {
+        self?.emergencyTurnOffAndQuit()
+      }
     }
     HotKeyManager.shared.register()
 
     self.refreshConfig()
     self.openConfigWindow()
+  }
+
+  private func emergencyTurnOffAndQuit() {
+    self.config.effects.deactivateAll()
+    self.config.save()
+    self.configChanged = false
+    CursorHider.shared.stopHiding()
+    self.screenManager?.stopAll()
+    NSApp.terminate(nil)
   }
 
   func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool
@@ -224,6 +243,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
   
   func applicationWillTerminate(_ notification: Notification) {
     CursorHider.shared.stopHiding()
+    self.screenManager?.stopAll()
   }
 
   private func refreshConfig() {
