@@ -8,7 +8,7 @@ class CursorTracker {
     private let timer: DispatchSourceTimer
     private var lastHash: Int = 0
     private var lastUpdateTime: CFTimeInterval = CACurrentMediaTime()
-    private let fadeDuration: CFTimeInterval = 0.1
+    private let fadeDuration: CFTimeInterval = 0.15
     
     // Thread-safe state
     private let lock = NSLock()
