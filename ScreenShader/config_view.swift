@@ -1,4 +1,37 @@
 import AppKit
+import Carbon.HIToolbox
+
+private extension NSEvent {
+  var isSpaceKey: Bool {
+    return charactersIgnoringModifiers == " " || keyCode == UInt16(kVK_Space)
+  }
+
+  var isReturnOrEnterKey: Bool {
+    return specialKey == .carriageReturn
+      || specialKey == .enter
+      || charactersIgnoringModifiers == "\r"
+      || charactersIgnoringModifiers == "\n"
+      || keyCode == UInt16(kVK_Return)
+      || keyCode == UInt16(kVK_ANSI_KeypadEnter)
+  }
+}
+
+class EffectsTableView: NSTableView {
+  var onSpaceOrEnter: (() -> Void)?
+
+  override func keyDown(with event: NSEvent) {
+    let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+    let isPlainKey = modifiers.isEmpty || modifiers == .shift
+
+    if isPlainKey && (event.isSpaceKey || event.isReturnOrEnterKey) {
+      if let onSpaceOrEnter = self.onSpaceOrEnter {
+        onSpaceOrEnter()
+        return
+      }
+    }
+    super.keyDown(with: event)
+  }
+}
 
 class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
   var config: Config! = nil
@@ -8,7 +41,7 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
   var onConfigUpdate: () -> Void = {}
   var errorMessage: ErrorMessage! = nil
 
-  private var tableView: NSTableView! = nil
+  var tableView: EffectsTableView! = nil
   private var errorMessageField: NSTextField! = nil
   private var newEffectButton: NSButton! = nil
   private var useCustomCursorCheckbox: NSButton! = nil
@@ -40,7 +73,10 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
     tabsPane.spacing = 16
     tabsPane.translatesAutoresizingMaskIntoConstraints = false
 
-    self.tableView = NSTableView()
+    self.tableView = EffectsTableView()
+    self.tableView.onSpaceOrEnter = { [weak self] in
+      self?.toggleSelectedEffect()
+    }
     self.tableView.delegate = self
     self.tableView.dataSource = self
     self.tableView.headerView = nil
@@ -218,14 +254,38 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
     return cellView
   }
 
-  @objc private func toggleActiveFromList(_ sender: NSButton) {
-    let row = sender.tag
+  func toggleEffect(at row: Int) {
     guard row >= 0 && row < self.effects.effectList().count else { return }
     let effect = self.effects.effectList()[row]
     self.effects.toggleActive(effect: effect)
     self.selectTab(index: row)
     self.refreshActiveEffects()
     self.onConfigUpdate()
+  }
+
+  func toggleSelectedEffect() {
+    self.toggleEffect(at: self.tableView.selectedRow)
+  }
+
+  @objc private func toggleActiveFromList(_ sender: NSButton) {
+    self.toggleEffect(at: sender.tag)
+  }
+
+  override func keyDown(with event: NSEvent) {
+    let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+    let isPlainKey = modifiers.isEmpty || modifiers == .shift
+
+    if isPlainKey && (event.isSpaceKey || event.isReturnOrEnterKey) {
+      if let firstResponder = self.view.window?.firstResponder {
+        if !(firstResponder is NSText || firstResponder is NSTextField || firstResponder is NSTextView) {
+          if self.tableView.selectedRow >= 0 {
+            self.toggleSelectedEffect()
+            return
+          }
+        }
+      }
+    }
+    super.keyDown(with: event)
   }
 
   func tableViewSelectionDidChange(_ notification: Notification) {
@@ -298,6 +358,8 @@ class ConfigWindowController: NSWindowController {
       self.configViewController.view.bottomAnchor.constraint(
         equalTo: window.contentView!.bottomAnchor),
     ])
+
+    window.initialFirstResponder = self.configViewController.tableView
   }
 
   func refreshActiveEffects() {
