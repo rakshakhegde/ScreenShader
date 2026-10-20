@@ -90,7 +90,7 @@ class OverlayController: NSObject, MTKViewDelegate {
     }
     self.screenCapture.onCaptureRestored = { [weak self] in
       guard let self = self else { return }
-      if self.config.effects.anyEffectActive() && self.errorMessage.get() == nil {
+      if self.config.isEnabled && self.config.effects.anyEffectActive() && self.errorMessage.get() == nil {
         Logger.shared.log("OverlayController[display \(self.targetDisplayID)]: Capture restored - revealing effect overlay.")
         self.window?.orderFrontRegardless()
       }
@@ -173,7 +173,7 @@ class OverlayController: NSObject, MTKViewDelegate {
   }
 
   func restartCapture() {
-      guard self.config.effects.anyEffectActive() && self.errorMessage.get() == nil else { return }
+      guard self.config.isEnabled && self.config.effects.anyEffectActive() && self.errorMessage.get() == nil else { return }
       if let displayLink = self.displayLink, !CVDisplayLinkIsRunning(displayLink) {
           CVDisplayLinkStart(displayLink)
       }
@@ -251,7 +251,7 @@ class OverlayController: NSObject, MTKViewDelegate {
 
   func refreshConfig() {
     let activeEffects = self.config.effects.getActiveEffects()
-    let active = !activeEffects.isEmpty
+    let active = self.config.isEnabled && !activeEffects.isEmpty
 
     let activeSources: [(id: UUID, source: String)] = activeEffects.map {
       ($0, self.config.effects.getShader(effect: $0))
@@ -293,7 +293,7 @@ class OverlayController: NSObject, MTKViewDelegate {
       if !self.window.isVisible {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
           guard let self = self else { return }
-          if self.config.effects.anyEffectActive() && self.errorMessage.get() == nil {
+          if self.config.isEnabled && self.config.effects.anyEffectActive() && self.errorMessage.get() == nil {
             self.window?.setIsVisible(true)
           }
         }

@@ -195,6 +195,12 @@ class Config: Codable {
     set { _customCursorScale = newValue }
   }
 
+  var _isEnabled: Bool?
+  var isEnabled: Bool {
+    get { return _isEnabled ?? true }
+    set { _isEnabled = newValue }
+  }
+
   static func getFileURL() -> URL {
     let fileManager = FileManager.default
     let appSupportDir = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)

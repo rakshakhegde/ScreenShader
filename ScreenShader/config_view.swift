@@ -227,6 +227,9 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
   }
 
   private func onUpdateEffect(effect: UUID) {
+    if self.effects.isActive(effect: effect) {
+      self.config.isEnabled = true
+    }
     self.tableView.reloadData()
     self.onConfigUpdate()
   }
@@ -300,6 +303,9 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
     guard row >= 0 && row < self.effects.effectList().count else { return }
     let effect = self.effects.effectList()[row]
     self.effects.toggleActive(effect: effect)
+    if self.effects.isActive(effect: effect) {
+      self.config.isEnabled = true
+    }
     self.selectTab(index: row)
     self.refreshActiveEffects()
     self.onConfigUpdate()

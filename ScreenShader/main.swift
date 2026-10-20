@@ -238,6 +238,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
   private func emergencyTurnOffAndQuit() {
     self.config.effects.deactivateAll()
+    self.config.isEnabled = false
     self.config.save()
     self.configChanged = false
     CursorHider.shared.stopHiding()
@@ -260,7 +261,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     self.statusItem.button?.image = self.getMenuBarIcon()
 
     // Manage cursor state BEFORE updating window visibility so WindowServer respects the change
-    if self.config.effects.anyEffectActive() && self.config.useCustomCursor && self.errorMessage.get() == nil {
+    let isRunning = self.config.isEnabled && self.config.effects.anyEffectActive()
+    if isRunning && self.config.useCustomCursor && self.errorMessage.get() == nil {
       CursorHider.shared.startHiding()
     } else {
       CursorHider.shared.stopHiding()
@@ -362,7 +364,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   private func getMenuBarIcon() -> NSImage {
-    let active = self.config.effects.anyEffectActive()
+    let active = self.config.isEnabled && self.config.effects.anyEffectActive()
     let systemSymbolName = active ? "paintbrush.fill" : "paintbrush"
     return NSImage(
       systemSymbolName: systemSymbolName, accessibilityDescription: "ScreenShader")!
@@ -370,9 +372,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
   @objc private func toggleEffect() {
     if self.config.effects.anyEffectActive() {
-      self.config.effects.deactivateAll()
+      self.config.isEnabled.toggle()
     } else {
       self.config.effects.activateDefault()
+      self.config.isEnabled = true
     }
     self.refreshConfig()
   }
