@@ -14,10 +14,18 @@ private extension NSEvent {
       || keyCode == UInt16(kVK_Return)
       || keyCode == UInt16(kVK_ANSI_KeypadEnter)
   }
+
+  var isDeleteKey: Bool {
+    return specialKey == .delete
+      || specialKey == .deleteForward
+      || keyCode == UInt16(kVK_Delete)
+      || keyCode == UInt16(kVK_ForwardDelete)
+  }
 }
 
 class EffectsTableView: NSTableView {
   var onSpaceOrEnter: (() -> Void)?
+  var onDelete: (() -> Void)?
 
   override func keyDown(with event: NSEvent) {
     let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -26,6 +34,13 @@ class EffectsTableView: NSTableView {
     if isPlainKey && (event.isSpaceKey || event.isReturnOrEnterKey) {
       if let onSpaceOrEnter = self.onSpaceOrEnter {
         onSpaceOrEnter()
+        return
+      }
+    }
+
+    if isPlainKey && event.isDeleteKey {
+      if let onDelete = self.onDelete {
+        onDelete()
         return
       }
     }
@@ -76,6 +91,9 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
     self.tableView = EffectsTableView()
     self.tableView.onSpaceOrEnter = { [weak self] in
       self?.toggleSelectedEffect()
+    }
+    self.tableView.onDelete = { [weak self] in
+      self?.deleteSelectedEffect()
     }
     self.tableView.delegate = self
     self.tableView.dataSource = self
@@ -281,21 +299,11 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
     self.toggleEffect(at: row)
   }
 
-  override func keyDown(with event: NSEvent) {
-    let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-    let isPlainKey = modifiers.isEmpty || modifiers == .shift
-
-    if isPlainKey && (event.isSpaceKey || event.isReturnOrEnterKey) {
-      if let firstResponder = self.view.window?.firstResponder {
-        if !(firstResponder is NSText || firstResponder is NSTextField || firstResponder is NSTextView) {
-          if self.tableView.selectedRow >= 0 {
-            self.toggleSelectedEffect()
-            return
-          }
-        }
-      }
-    }
-    super.keyDown(with: event)
+  func deleteSelectedEffect() {
+    let row = self.tableView.selectedRow
+    guard row >= 0 && row < self.effects.effectList().count else { return }
+    let effect = self.effects.effectList()[row]
+    self.effectToController[effect]?.deleteEffect()
   }
 
   private func updateDetailView(for row: Int) {
