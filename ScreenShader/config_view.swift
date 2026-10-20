@@ -199,9 +199,19 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
   }
 
   private func onDeleteEffect(effect: UUID) {
-    self.tableView.reloadData()
-    self.tableView.deselectAll(nil)
+    let deletedRow = self.tableView.selectedRow
     self.effectToController.removeValue(forKey: effect)
+    self.tableView.reloadData()
+
+    let count = self.effects.effectList().count
+    if count > 0 {
+      let nextIndex = min(max(0, deletedRow), count - 1)
+      self.selectTab(index: nextIndex)
+      self.updateDetailView(for: nextIndex)
+    } else {
+      self.tableView.deselectAll(nil)
+      self.contentPane.subviews = []
+    }
     self.onConfigUpdate()
   }
 
@@ -288,10 +298,9 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
     super.keyDown(with: event)
   }
 
-  func tableViewSelectionDidChange(_ notification: Notification) {
-    let selectedRow = self.tableView.selectedRow
-    if selectedRow >= 0 && selectedRow < self.effects.effectList().count {
-      let selectedEffect = self.effects.effectList()[selectedRow]
+  private func updateDetailView(for row: Int) {
+    if row >= 0 && row < self.effects.effectList().count {
+      let selectedEffect = self.effects.effectList()[row]
 
       if !self.effectToController.keys.contains(selectedEffect) {
         let controller = EffectViewController()
@@ -314,6 +323,10 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
     } else {
       self.contentPane.subviews = []
     }
+  }
+
+  func tableViewSelectionDidChange(_ notification: Notification) {
+    self.updateDetailView(for: self.tableView.selectedRow)
   }
 
   func refreshActiveEffects() {
