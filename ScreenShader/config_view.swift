@@ -185,6 +185,7 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
   private func selectTab(index: Int) {
     self.tableView.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
     self.tableView.scrollRowToVisible(index)
+    self.view.window?.makeFirstResponder(self.tableView)
   }
 
   @objc private func newEffect() {
@@ -268,7 +269,8 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
   }
 
   @objc private func toggleActiveFromList(_ sender: NSButton) {
-    self.toggleEffect(at: sender.tag)
+    let row = self.tableView.row(for: sender) >= 0 ? self.tableView.row(for: sender) : sender.tag
+    self.toggleEffect(at: row)
   }
 
   override func keyDown(with event: NSEvent) {
