@@ -55,7 +55,6 @@ class OverlayController: NSObject, MTKViewDelegate {
     metalView.isPaused = true // Pause internal timer
     metalView.enableSetNeedsDisplay = false
     self.window.contentView = metalView
-    self.window.makeKeyAndOrderFront(nil)
 
     self.renderer = self.makeRenderer(metalLayer: metalView.metalLayer)
 
@@ -283,7 +282,18 @@ class OverlayController: NSObject, MTKViewDelegate {
       CursorHider.shared.startHiding()
     }
 
-    self.window.setIsVisible(shouldShow)
+    if shouldShow {
+      if !self.window.isVisible {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+          guard let self = self else { return }
+          if self.config.effects.getActiveEffect() != nil && self.errorMessage.get() == nil {
+            self.window?.setIsVisible(true)
+          }
+        }
+      }
+    } else {
+      self.window.setIsVisible(false)
+    }
     self.screenCapture.setCapturing(shouldShow)
 
     if let displayLink = self.displayLink {
