@@ -37,6 +37,8 @@ class MetalRenderer {
   
   private var intermediateTextureA: MTLTexture? = nil
   private var intermediateTextureB: MTLTexture? = nil
+  private var previousFrameTexture: MTLTexture? = nil
+  private var hasPreviousFrame: Bool = false
 
   private let renderTargetPixelFormat: MTLPixelFormat
   private let captureTexturePixelFormat: MTLPixelFormat
@@ -71,7 +73,7 @@ class MetalRenderer {
     metalLayer.pixelFormat = drawablePixelFormat
     metalLayer.colorspace = colorspace
     metalLayer.wantsExtendedDynamicRangeContent = wantsEDR
-    metalLayer.framebufferOnly = true
+    metalLayer.framebufferOnly = false
     metalLayer.contentsScale = backingScaleFactor
     metalLayer.isOpaque = true
     metalLayer.backgroundColor = NSColor.black.cgColor
@@ -118,6 +120,7 @@ class MetalRenderer {
 
       struct ShaderInput {
         TextureWrapper inputTexture;
+        TextureWrapper previousTexture;
         float2 texCoord;
         float2 screenPosition;
         float2 screenSize;
@@ -168,10 +171,12 @@ class MetalRenderer {
       fragment float4 fragment_main(
         VertexOut in [[stage_in]],
         texture2d<float> inTexture [[texture(0)]],
+        texture2d<float> prevTexture [[texture(1)]],
         constant Uniforms &uniforms [[buffer(0)]]
       ) {
         ShaderInput shaderInput;
         shaderInput.inputTexture = TextureWrapper{inTexture, uniforms.screenSize};
+        shaderInput.previousTexture = TextureWrapper{prevTexture, uniforms.screenSize};
         shaderInput.texCoord = in.texCoord;
         shaderInput.screenPosition = texToScreen(in.texCoord, uniforms.screenSize);
         shaderInput.screenSize = uniforms.screenSize;
@@ -312,6 +317,17 @@ class MetalRenderer {
     }
   }
 
+  private func ensurePreviousFrameTexture(width: Int, height: Int) {
+    if self.previousFrameTexture?.width != width || self.previousFrameTexture?.height != height {
+      let desc = MTLTextureDescriptor.texture2DDescriptor(
+        pixelFormat: self.renderTargetPixelFormat, width: width, height: height, mipmapped: false)
+      desc.usage = [.shaderRead]
+      desc.storageMode = .private
+      self.previousFrameTexture = self.device.makeTexture(descriptor: desc)
+      self.hasPreviousFrame = false
+    }
+  }
+
   private func encodeCursorPass(
     commandBuffer: MTLCommandBuffer,
     baseTexture: MTLTexture,
@@ -418,6 +434,7 @@ class MetalRenderer {
     commandBuffer: MTLCommandBuffer,
     pipeline: MTLRenderPipelineState,
     sourceTexture: MTLTexture,
+    previousTexture: MTLTexture,
     destinationTexture: MTLTexture,
     uniforms: inout RenderUniforms
   ) {
@@ -430,6 +447,7 @@ class MetalRenderer {
 
     encoder.setRenderPipelineState(pipeline)
     encoder.setFragmentTexture(sourceTexture, index: 0)
+    encoder.setFragmentTexture(previousTexture, index: 1)
     encoder.setFragmentBytes(&uniforms, length: MemoryLayout<RenderUniforms>.stride, index: 0)
     encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
     encoder.endEncoding()
@@ -468,6 +486,11 @@ class MetalRenderer {
     guard let commandBuffer = self.commandQueue.makeCommandBuffer() else {
       return
     }
+
+    self.ensurePreviousFrameTexture(width: width, height: height)
+    let prevTextureToUse = (self.hasPreviousFrame && self.previousFrameTexture != nil)
+      ? self.previousFrameTexture!
+      : texture
 
     // Pass 1: Render cursor into intermediateTextureA only if cursor is active and on this screen
     var currentSource = self.encodeCursorPass(
@@ -513,10 +536,20 @@ class MetalRenderer {
         commandBuffer: commandBuffer,
         pipeline: pipeline,
         sourceTexture: currentSource,
+        previousTexture: prevTextureToUse,
         destinationTexture: destinationTexture,
         uniforms: &uniforms
       )
       currentSource = destinationTexture
+    }
+
+    if let blitEncoder = commandBuffer.makeBlitCommandEncoder(),
+       let prevTex = self.previousFrameTexture,
+       drawable.texture.width == prevTex.width,
+       drawable.texture.height == prevTex.height {
+      blitEncoder.copy(from: drawable.texture, to: prevTex)
+      blitEncoder.endEncoding()
+      self.hasPreviousFrame = true
     }
 
     commandBuffer.present(drawable)

@@ -8,6 +8,8 @@ let defaultShaderSource: String = """
   struct ShaderInput {
     // A texture containing the input screen capture data.
     texture2d<float> inputTexture;
+    // A texture containing the rendered output of the previous frame (useful for motion blur, persistence, phosphor decay, feedback, etc.)
+    texture2d<float> previousTexture;
     // The texture coordinates for indexing into inputTexture at the current
     // position. The origin is at the top left of the screen.
     float2 texCoord;
@@ -47,6 +49,19 @@ let defaultShaderSource: String = """
   """
 
 let predefinedShaders: [(String, String)] = [
+  (
+    "Motion blur / Persistence",
+    """
+    float4 shaderFunction(ShaderInput in) {
+      constexpr sampler s(address::clamp_to_edge, filter::linear);
+      float4 current = in.inputTexture.sample(s, in.texCoord);
+      float4 previous = in.previousTexture.sample(s, in.texCoord);
+
+      // Blend current frame with previous frame output (temporal persistence / phosphor decay)
+      return mix(current, previous, 0.7);
+    }
+    """
+  ),
   (
     "Swap red-blue channels",
     """
