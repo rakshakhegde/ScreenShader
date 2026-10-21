@@ -178,6 +178,7 @@ class ConfigViewController: NSViewController, NSTableViewDelegate, NSTableViewDa
       self.newEffectButton.heightAnchor.constraint(equalToConstant: 30),
       self.useCustomCursorCheckbox.heightAnchor.constraint(equalToConstant: 24),
       self.useCustomCursorCheckbox.leadingAnchor.constraint(equalTo: tabsPane.leadingAnchor, constant: 18),
+      self.useCustomCursorCheckbox.bottomAnchor.constraint(equalTo: tabsPane.bottomAnchor, constant: -48),
       
       self.customCursorSliderStack.heightAnchor.constraint(equalToConstant: 24),
       self.customCursorSliderStack.leadingAnchor.constraint(equalTo: tabsPane.leadingAnchor, constant: 36),
